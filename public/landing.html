@@ -536,17 +536,55 @@ footer a { color:var(--t); text-decoration:none; }
   font-weight:300; margin-bottom:28px;
 }
 .wpp-body strong { color:var(--ink); font-weight:600; }
-.wpp-list {
-  list-style:none; display:flex; flex-direction:column; gap:10px;
+/* ─── ALERT CARDS ─── */
+.wc-stack { display:flex; flex-direction:column; gap:8px; margin-top:28px; }
+.wc {
+  display:flex; align-items:center; gap:14px;
+  padding:14px 16px 14px 20px;
+  background:rgba(8,18,18,.95);
+  border:1px solid rgba(0,200,215,.1); border-left:none;
+  border-radius:0 10px 10px 0;
+  position:relative; overflow:hidden;
+  opacity:0; transform:translateX(-28px);
+  transition:opacity .5s, transform .5s, border-color .3s, background .3s;
+  backdrop-filter:blur(10px);
 }
-.wpp-list li {
-  display:flex; align-items:center; gap:10px;
-  font-size:12px; color:#3D5E5E;
+.wc::before {
+  content:''; position:absolute; left:0; top:0; bottom:0; width:3px; border-radius:3px 0 0 3px;
 }
-.wpl-dot {
-  width:6px; height:6px; border-radius:50%;
-  background:var(--t); flex-shrink:0;
+.wc.wc-warn::before { background:#FFB400; box-shadow:0 0 10px rgba(255,180,0,.5); }
+.wc.wc-cyan::before { background:var(--t); box-shadow:0 0 10px rgba(0,200,215,.5); }
+.wc.wc-lime::before { background:var(--lime); box-shadow:0 0 10px rgba(203,255,77,.4); }
+.wc.wc-red::before { background:#FF4F4F; box-shadow:0 0 10px rgba(255,79,79,.4); }
+.wpp-left.in .wc { opacity:1; transform:translateX(0); }
+.wc-d1{transition-delay:.05s;} .wc-d2{transition-delay:.15s;} .wc-d3{transition-delay:.25s;} .wc-d4{transition-delay:.35s;}
+.wc:hover { border-color:rgba(0,200,215,.22); background:rgba(0,200,215,.03); }
+.wc-icon {
+  width:38px; height:38px; border-radius:9px;
+  display:flex; align-items:center; justify-content:center;
+  font-size:17px; flex-shrink:0;
 }
+.wc-warn .wc-icon { background:rgba(255,180,0,.07); }
+.wc-cyan .wc-icon { background:rgba(0,200,215,.07); }
+.wc-lime .wc-icon { background:rgba(203,255,77,.07); }
+.wc-red  .wc-icon { background:rgba(255,79,79,.07); }
+.wc-body { flex:1; min-width:0; }
+.wc-label { font-size:9px; letter-spacing:2.5px; text-transform:uppercase; margin-bottom:4px; }
+.wc-warn .wc-label { color:rgba(255,180,0,.5); }
+.wc-cyan .wc-label { color:rgba(0,200,215,.5); }
+.wc-lime .wc-label { color:rgba(203,255,77,.5); }
+.wc-red  .wc-label { color:rgba(255,79,79,.5); }
+.wc-val { font-size:14px; font-weight:700; color:#fff; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.wc-sub { font-size:10px; color:#2A4040; margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.wc-chip {
+  font-size:8px; font-weight:700; letter-spacing:1.5px; text-transform:uppercase;
+  padding:4px 9px; border-radius:4px; flex-shrink:0;
+}
+.wc-warn .wc-chip { color:#FFB400; background:rgba(255,180,0,.1); border:1px solid rgba(255,180,0,.25); }
+.wc-cyan .wc-chip { color:var(--t); background:rgba(0,200,215,.1); border:1px solid rgba(0,200,215,.25); }
+.wc-lime .wc-chip { color:var(--lime); background:rgba(203,255,77,.1); border:1px solid rgba(203,255,77,.25); }
+.wc-red  .wc-chip { color:#FF6060; background:rgba(255,79,79,.1); border:1px solid rgba(255,79,79,.25); }
+.wc-wpp { font-size:13px; flex-shrink:0; opacity:.3; margin-left:4px; }
 
 /* SCENE */
 .wpp-scene {
@@ -824,6 +862,10 @@ footer a { color:var(--t); text-decoration:none; }
   .step-code{display:none}
   section,section.proof,section.metrics,section.how,section.final{padding:60px 24px}
   footer{flex-direction:column;gap:12px;text-align:center}
+  .wpp-inner{grid-template-columns:1fr;gap:48px;}
+  .wpp-section{padding:80px 24px;}
+  .wpp-right{display:none;}
+  .wc-val{font-size:13px;}
 }
 </style>
 </head>
@@ -1142,17 +1184,56 @@ footer a { color:var(--t); text-decoration:none; }
         Seu time recebe.<br/>Você <em>já decidiu.</em>
       </h2>
       <p class="wpp-body">
-        O Headstock envia automaticamente alertas, relatórios e indicadores
-        direto no WhatsApp da equipe e dos CEOs.<br/><br/>
-        <strong>Sem abrir o sistema. Sem perguntar pro time. A informação chega.</strong>
+        O Headstock dispara alertas, relatórios e indicadores direto no WhatsApp —<br/>
+        <strong>sem abrir o sistema. Sem perguntar pro time.</strong>
       </p>
-      <ul class="wpp-list">
-        <li><span class="wpl-dot"></span>Alertas de projeto em risco</li>
-        <li><span class="wpl-dot"></span>Resumo semanal de horas e ocupação</li>
-        <li><span class="wpl-dot"></span>Indicadores de campanha no fechamento</li>
-        <li><span class="wpl-dot"></span>Avisos de contrato próximo do limite</li>
-        <li><span class="wpl-dot"></span>Relatório executivo toda segunda-feira</li>
-      </ul>
+      <div class="wc-stack">
+
+        <div class="wc wc-warn wc-d1">
+          <div class="wc-icon">⚠️</div>
+          <div class="wc-body">
+            <div class="wc-label">Projeto em risco</div>
+            <div class="wc-val">Verão 2025 — 3 dias sem movimentação</div>
+            <div class="wc-sub">responsável notificado automaticamente</div>
+          </div>
+          <div class="wc-chip">Atenção</div>
+          <div class="wc-wpp">💬</div>
+        </div>
+
+        <div class="wc wc-cyan wc-d2">
+          <div class="wc-icon">📊</div>
+          <div class="wc-body">
+            <div class="wc-label">Receita semanal</div>
+            <div class="wc-val">R$ 148.000 <span style="color:var(--t);font-size:11px;font-weight:400">↑ 12%</span></div>
+            <div class="wc-sub">vs semana anterior · toda segunda às 09:00</div>
+          </div>
+          <div class="wc-chip">Enviado</div>
+          <div class="wc-wpp">💬</div>
+        </div>
+
+        <div class="wc wc-lime wc-d3">
+          <div class="wc-icon">📈</div>
+          <div class="wc-body">
+            <div class="wc-label">Google Ads · ROAS</div>
+            <div class="wc-val">4.8× retorno — escalar budget</div>
+            <div class="wc-sub">recomendação gerada automaticamente</div>
+          </div>
+          <div class="wc-chip">Decisão</div>
+          <div class="wc-wpp">💬</div>
+        </div>
+
+        <div class="wc wc-red wc-d4">
+          <div class="wc-icon">👥</div>
+          <div class="wc-body">
+            <div class="wc-label">Ocupação · Equipe Criação</div>
+            <div class="wc-val">88% ocupada · 1 colaborador no limite</div>
+            <div class="wc-sub">Pedro Santos — 47h na semana</div>
+          </div>
+          <div class="wc-chip">Alerta</div>
+          <div class="wc-wpp">💬</div>
+        </div>
+
+      </div>
     </div>
 
     <div class="wpp-right reveal">
