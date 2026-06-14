@@ -1,0 +1,987 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Headstock — Apresentação</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+
+  :root {
+    --turquesa: #00B8C6;
+    --lime: #C8F34D;
+    --bg-dark: #0A1F1F;
+    --card-dark: #0F2A2A;
+    --border-col: #1F3A3A;
+    --text-main: #E8F4F4;
+    --text-muted: #6B9E9E;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Inter', sans-serif;
+    background: #111;
+    color: var(--text-main);
+  }
+
+  /* ── SLIDES ── */
+  .slide {
+    width: 297mm;
+    min-height: 210mm;
+    background: var(--bg-dark);
+    padding: 14mm 18mm;
+    page-break-after: always;
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+
+  /* decorative circles */
+  .slide::before {
+    content: '';
+    position: absolute;
+    width: 320px; height: 320px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(0,184,198,0.08) 0%, transparent 70%);
+    top: -80px; right: -80px;
+    pointer-events: none;
+  }
+
+  @media print {
+    body { background: var(--bg-dark); }
+    .slide { page-break-after: always; margin: 0; }
+    .no-print { display: none; }
+  }
+
+  /* ── NAV ── */
+  .nav {
+    position: fixed; top: 0; left: 0; right: 0;
+    background: #0A0A0A;
+    display: flex; gap: 8px; flex-wrap: wrap;
+    padding: 8px 16px;
+    z-index: 100;
+    border-bottom: 1px solid #222;
+  }
+  .nav button {
+    background: #1a1a1a; border: 1px solid #333;
+    color: #aaa; padding: 4px 12px; border-radius: 4px;
+    cursor: pointer; font-size: 11px; font-family: inherit;
+  }
+  .nav button:hover { background: var(--turquesa); color: #000; }
+  .nav .print-btn {
+    margin-left: auto;
+    background: var(--lime); color: #000; border-color: var(--lime);
+    font-weight: 600;
+  }
+
+  .slides-wrapper { margin-top: 44px; display: flex; flex-direction: column; gap: 4px; }
+
+  /* ── TIPOGRAFIA ── */
+  .eyebrow {
+    font-size: 10px; font-weight: 600; letter-spacing: 3px;
+    text-transform: uppercase; color: var(--turquesa);
+    margin-bottom: 10px;
+  }
+  h1 {
+    font-size: 52px; font-weight: 900; line-height: 1.05;
+    color: #fff;
+  }
+  h1 span { color: var(--turquesa); }
+  h2 {
+    font-size: 32px; font-weight: 800; color: #fff;
+    margin-bottom: 6px;
+  }
+  h2 span { color: var(--turquesa); }
+  h3 {
+    font-size: 16px; font-weight: 700; color: #fff;
+    margin-bottom: 6px;
+  }
+  p { font-size: 13px; line-height: 1.65; color: var(--text-muted); }
+  p strong { color: var(--text-main); }
+
+  /* ── CHIPS / BADGES ── */
+  .chip {
+    display: inline-block;
+    padding: 3px 10px; border-radius: 20px;
+    font-size: 10px; font-weight: 600; letter-spacing: .5px;
+    text-transform: uppercase;
+  }
+  .chip-turq { background: rgba(0,184,198,.15); color: var(--turquesa); border: 1px solid rgba(0,184,198,.3); }
+  .chip-lime { background: rgba(200,243,77,.12); color: var(--lime); border: 1px solid rgba(200,243,77,.3); }
+  .chip-amber { background: rgba(251,191,36,.12); color: #FBBF24; border: 1px solid rgba(251,191,36,.3); }
+  .chip-red   { background: rgba(239,68,68,.12);  color: #EF4444; border: 1px solid rgba(239,68,68,.3); }
+
+  /* ── CARD ── */
+  .card {
+    background: var(--card-dark);
+    border: 1px solid var(--border-col);
+    border-radius: 10px;
+    padding: 16px;
+  }
+  .card-sm { padding: 12px 14px; }
+
+  /* ── KPI ROW ── */
+  .kpi-row { display: flex; gap: 12px; margin-top: 14px; }
+  .kpi {
+    flex: 1;
+    background: var(--card-dark);
+    border: 1px solid var(--border-col);
+    border-radius: 8px;
+    padding: 14px 16px;
+  }
+  .kpi-label { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-muted); margin-bottom: 4px; }
+  .kpi-value { font-size: 26px; font-weight: 800; color: #fff; }
+  .kpi-sub { font-size: 10px; color: var(--text-muted); margin-top: 2px; }
+  .kpi-turq { border-top: 2px solid var(--turquesa); }
+  .kpi-lime  { border-top: 2px solid var(--lime); }
+  .kpi-amber { border-top: 2px solid #FBBF24; }
+
+  /* ── GRID ── */
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+  .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+
+  /* ── FEATURE LIST ── */
+  .feat-list { list-style: none; display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+  .feat-list li {
+    display: flex; align-items: flex-start; gap: 10px;
+    font-size: 12.5px; color: var(--text-muted);
+  }
+  .feat-list li .icon {
+    width: 22px; height: 22px; border-radius: 6px;
+    background: rgba(0,184,198,.15); border: 1px solid rgba(0,184,198,.25);
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; font-size: 12px;
+  }
+  .feat-list li strong { color: var(--text-main); }
+
+  /* ── DIVIDER ── */
+  .divider {
+    height: 1px; background: var(--border-col);
+    margin: 14px 0;
+  }
+
+  /* ── TIMELINE ── */
+  .timeline { display: flex; gap: 0; margin-top: 18px; }
+  .tl-item { flex: 1; position: relative; padding-top: 16px; }
+  .tl-item::before {
+    content: '';
+    position: absolute; top: 6px; left: 0; right: 0;
+    height: 2px; background: var(--border-col);
+  }
+  .tl-item:first-child::before { left: 50%; }
+  .tl-item:last-child::before  { right: 50%; }
+  .tl-dot {
+    position: absolute; top: 0; left: 50%; transform: translateX(-50%);
+    width: 14px; height: 14px; border-radius: 50%;
+    border: 2px solid var(--turquesa); background: var(--bg-dark);
+  }
+  .tl-dot.done { background: var(--turquesa); }
+  .tl-dot.next { border-color: var(--lime); }
+  .tl-content { text-align: center; padding: 0 8px; }
+  .tl-phase { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
+  .tl-phase.done { color: var(--turquesa); }
+  .tl-phase.next { color: var(--lime); }
+  .tl-title { font-size: 12px; font-weight: 600; color: #fff; margin-bottom: 4px; }
+  .tl-desc { font-size: 10.5px; color: var(--text-muted); line-height: 1.5; }
+
+  /* ── PROGRESS BAR ── */
+  .progress { height: 5px; background: var(--border-col); border-radius: 3px; overflow: hidden; }
+  .progress-fill { height: 100%; border-radius: 3px; background: var(--turquesa); }
+  .progress-fill.lime { background: var(--lime); }
+
+  /* ── TABLE ── */
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  th { text-align: left; padding: 8px 10px; font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-muted); border-bottom: 1px solid var(--border-col); }
+  td { padding: 9px 10px; border-bottom: 1px solid var(--border-col); color: var(--text-muted); }
+  td strong { color: var(--text-main); }
+  tr:last-child td { border-bottom: none; }
+
+  /* ── SLIDE HEADER ── */
+  .slide-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 20px;
+  }
+  .slide-num {
+    font-size: 10px; color: var(--text-muted);
+    font-weight: 500; letter-spacing: 1px;
+  }
+  .slide-logo {
+    font-size: 12px; font-weight: 800; letter-spacing: 2px;
+    color: var(--turquesa);
+  }
+
+  /* ── ACCENT LINE ── */
+  .accent-line {
+    width: 48px; height: 3px; border-radius: 2px;
+    background: var(--turquesa);
+    margin-bottom: 14px;
+  }
+
+  /* ── ROLE CARDS ── */
+  .role-card {
+    background: var(--card-dark);
+    border: 1px solid var(--border-col);
+    border-radius: 10px;
+    padding: 16px;
+  }
+  .role-card .role-icon { font-size: 22px; margin-bottom: 8px; }
+  .role-card .role-title { font-size: 13px; font-weight: 700; color: #fff; margin-bottom: 4px; }
+  .role-card .role-user { font-size: 10px; color: var(--turquesa); margin-bottom: 8px; font-weight: 500; }
+  .role-card p { font-size: 11px; }
+
+  /* ── KANBAN ── */
+  .kanban { display: flex; gap: 8px; margin-top: 12px; }
+  .kanban-col {
+    flex: 1;
+    background: rgba(15,42,42,.6);
+    border: 1px solid var(--border-col);
+    border-radius: 8px;
+    padding: 10px 8px;
+  }
+  .kanban-col-title {
+    font-size: 9px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 1px; color: var(--text-muted);
+    margin-bottom: 8px; text-align: center;
+  }
+  .kanban-card {
+    background: var(--bg-dark);
+    border: 1px solid var(--border-col);
+    border-radius: 5px;
+    padding: 8px 8px;
+    margin-bottom: 5px;
+    font-size: 10px;
+    color: var(--text-muted);
+  }
+  .kanban-card .op-num { color: var(--turquesa); font-weight: 700; font-size: 9px; }
+  .kanban-card .op-name { color: var(--text-main); font-weight: 600; margin: 2px 0; }
+
+  /* ── STACK ICONS ── */
+  .stack-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 12px;
+    background: var(--card-dark);
+    border: 1px solid var(--border-col);
+    border-radius: 8px;
+  }
+  .stack-icon {
+    width: 32px; height: 32px;
+    background: rgba(0,184,198,.1);
+    border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px; flex-shrink: 0;
+  }
+  .stack-name { font-size: 12px; font-weight: 600; color: #fff; }
+  .stack-desc { font-size: 10px; color: var(--text-muted); }
+
+  /* ── COVER specific ── */
+  .cover-logo {
+    font-size: 13px; font-weight: 800; letter-spacing: 4px;
+    color: var(--turquesa); margin-bottom: 36px;
+  }
+  .cover h1 { font-size: 62px; margin-bottom: 16px; }
+  .cover .subtitle {
+    font-size: 15px; color: var(--text-muted); max-width: 480px;
+    line-height: 1.6; margin-bottom: 32px;
+  }
+  .cover .presented-to {
+    font-size: 11px; color: var(--text-muted);
+    border-top: 1px solid var(--border-col);
+    padding-top: 16px; margin-top: auto;
+  }
+  .cover .presented-to strong { color: var(--text-main); }
+
+  /* ── ALERT BADGE ── */
+  .alert-item {
+    display: flex; align-items: flex-start; gap: 10px;
+    padding: 10px 12px;
+    background: rgba(239,68,68,.06);
+    border: 1px solid rgba(239,68,68,.2);
+    border-radius: 7px;
+    margin-bottom: 8px;
+  }
+  .alert-item .dot { width: 8px; height: 8px; border-radius: 50%; background: #EF4444; margin-top: 4px; flex-shrink: 0; }
+  .alert-item .dot.amber { background: #FBBF24; }
+  .alert-item p { font-size: 11.5px; }
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<div class="nav no-print">
+  <span style="font-size:11px;color:#555;align-self:center;font-weight:600;letter-spacing:2px;">HEADSTOCK</span>
+  <button onclick="window.print()" class="print-btn">⬇ Salvar PDF</button>
+</div>
+
+<div class="slides-wrapper">
+
+<!-- ═══════════════════════════════════════════════════════════════
+     SLIDE 1 — CAPA
+═══════════════════════════════════════════════════════════════ -->
+<section class="slide cover" style="justify-content:flex-start;padding-top:22mm;">
+  <div class="cover-logo">HEADSTOCK</div>
+  <h1>Inteligência<br/><span>Gerencial</span><br/>para Agências.</h1>
+  <p class="subtitle">Uma plataforma que consolida equipes, projetos, campanhas e indicadores em uma única visão — alimentada pelos dados do Operand que você já usa.</p>
+  <div style="display:flex;gap:10px;margin-bottom:auto;">
+    <span class="chip chip-turq">Versão 1.0 — Junho 2026</span>
+    <span class="chip chip-lime">Fases 1 e 3 entregues</span>
+  </div>
+  <div class="presented-to" style="margin-top:32px;">
+    Apresentado para <strong>Celso · CRCom</strong> &nbsp;·&nbsp; Junho 2026
+  </div>
+
+  <!-- decorative grid -->
+  <div style="position:absolute;right:18mm;top:50%;transform:translateY(-50%);opacity:.04;">
+    <svg width="260" height="260" viewBox="0 0 260 260" fill="none">
+      <defs>
+        <pattern id="grid" width="26" height="26" patternUnits="userSpaceOnUse">
+          <path d="M 26 0 L 0 0 0 26" fill="none" stroke="#00B8C6" stroke-width="1"/>
+        </pattern>
+      </defs>
+      <rect width="260" height="260" fill="url(#grid)" />
+    </svg>
+  </div>
+</section>
+
+
+<!-- ═══════════════════════════════════════════════════════════════
+     SLIDE 2 — O QUE É O HEADSTOCK
+═══════════════════════════════════════════════════════════════ -->
+<section class="slide">
+  <div class="slide-header">
+    <div class="slide-logo">HEADSTOCK</div>
+    <div class="slide-num">02 / 10</div>
+  </div>
+
+  <div class="eyebrow">Visão Geral</div>
+  <h2>O que é o <span>Headstock</span>?</h2>
+  <div class="accent-line"></div>
+
+  <div class="grid-2" style="margin-top:16px;align-items:start;gap:20px;">
+    <div>
+      <p style="font-size:13.5px;color:var(--text-muted);line-height:1.7;margin-bottom:16px;">
+        Headstock é um <strong>hub de inteligência gerencial</strong> para agências de marketing e empresas de varejo. Ele não substitui o Operand — <strong>integra com ele</strong>, importando os dados que sua equipe já lança para entregar visões consolidadas ao CEO.
+      </p>
+      <p style="font-size:13.5px;color:var(--text-muted);line-height:1.7;">
+        O resultado: <strong>menos planilhas, menos reuniões de status, mais decisão baseada em dado</strong>.
+      </p>
+
+      <div class="divider"></div>
+
+      <ul class="feat-list">
+        <li>
+          <div class="icon">⬆</div>
+          <span><strong>Importação automática do Operand</strong> — sobe o xlsx exportado e o Headstock processa tudo.</span>
+        </li>
+        <li>
+          <div class="icon">👥</div>
+          <span><strong>Visão de equipes e horas</strong> — quem está sobrecarregado, quem tem capacidade disponível.</span>
+        </li>
+        <li>
+          <div class="icon">📊</div>
+          <span><strong>Campanhas e performance</strong> — ROAS, ROI, CPL, decisão de investimento por canal.</span>
+        </li>
+        <li>
+          <div class="icon">🗂</div>
+          <span><strong>Projetos e Jobs</strong> — saúde, progresso e alertas em tempo real.</span>
+        </li>
+      </ul>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:12px;">
+      <div class="card" style="border-top:2px solid var(--turquesa);">
+        <div class="eyebrow" style="margin-bottom:6px;">Sua equipe continua no</div>
+        <div style="font-size:20px;font-weight:800;color:#fff;">Operand ag</div>
+        <p style="margin-top:6px;font-size:11.5px;">Nada muda na operação. A equipe lança horas, jobs e projetos normalmente.</p>
+      </div>
+      <div style="text-align:center;font-size:22px;color:var(--border-col);">↓</div>
+      <div class="card" style="border-top:2px solid var(--lime);">
+        <div class="eyebrow" style="margin-bottom:6px;">Você decide no</div>
+        <div style="font-size:20px;font-weight:800;color:#fff;">Headstock</div>
+        <p style="margin-top:6px;font-size:11.5px;">Importa o relatório, vê tudo consolidado, toma decisão com dado.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ═══════════════════════════════════════════════════════════════
+     SLIDE 3 — PERFIS DE ACESSO
+═══════════════════════════════════════════════════════════════ -->
+<section class="slide">
+  <div class="slide-header">
+    <div class="slide-logo">HEADSTOCK</div>
+    <div class="slide-num">03 / 10</div>
+  </div>
+
+  <div class="eyebrow">Controle de Acesso</div>
+  <h2>Cada perfil vê <span>apenas o que importa</span></h2>
+  <div class="accent-line"></div>
+
+  <div class="grid-2" style="margin-top:18px;gap:12px;">
+    <div class="role-card" style="border-top:2px solid var(--turquesa);">
+      <div class="role-icon">🌐</div>
+      <div class="role-title">Master Platform</div>
+      <div class="role-user">gleison@headstock.com</div>
+      <p>Visão global de toda a plataforma — todas as agências, todos os clientes, alertas críticos e saúde da infraestrutura. Envia cards executivos para as agências.</p>
+    </div>
+
+    <div class="role-card" style="border-top:2px solid var(--lime);">
+      <div class="role-icon">🏢</div>
+      <div class="role-title">CEO de Agência</div>
+      <div class="role-user">celso@crcom.com · gleison@radiolawifi.com</div>
+      <p>Vê somente sua agência e seus clientes. Dashboard com KPIs de equipe, carteira, campanhas e projetos. Importa relatórios do Operand.</p>
+    </div>
+
+    <div class="role-card" style="border-top:2px solid #FBBF24;">
+      <div class="role-icon">🛒</div>
+      <div class="role-title">CEO Varejo</div>
+      <div class="role-user">raphael@fcm.com · zac@cholet.com</div>
+      <p>Dashboard comercial e operacional da própria empresa — vendas, metas, produtos, estoque, contas a pagar/receber e produção (OPs).</p>
+    </div>
+
+    <div class="role-card" style="border-top:2px solid #8B5CF6;">
+      <div class="role-icon">🔧</div>
+      <div class="role-title">Operacional Varejo</div>
+      <div class="role-user">funcionario@empresa.com</div>
+      <p>Importa arquivos e movimenta Ordens de Produção pelo pipeline de etapas. Sem acesso a vendas, metas ou dados financeiros.</p>
+    </div>
+  </div>
+
+  <div class="divider" style="margin-top:18px;"></div>
+  <p style="font-size:11.5px;text-align:center;">
+    Login único em <strong>/login</strong> → redirect automático para o dashboard correto do perfil.
+  </p>
+</section>
+
+
+<!-- ═══════════════════════════════════════════════════════════════
+     SLIDE 4 — DASHBOARD AGÊNCIA (CEO)
+═══════════════════════════════════════════════════════════════ -->
+<section class="slide">
+  <div class="slide-header">
+    <div class="slide-logo">HEADSTOCK</div>
+    <div class="slide-num">04 / 10</div>
+  </div>
+
+  <div class="eyebrow">Para o Celso · /agencia</div>
+  <h2>Dashboard <span>Executivo da Agência</span></h2>
+  <div class="accent-line"></div>
+
+  <div class="kpi-row" style="margin-top:14px;">
+    <div class="kpi kpi-turq">
+      <div class="kpi-label">Receita Contratada</div>
+      <div class="kpi-value">R$ 148k</div>
+      <div class="kpi-sub">total da carteira ativa</div>
+    </div>
+    <div class="kpi kpi-lime">
+      <div class="kpi-label">Ocupação Semanal</div>
+      <div class="kpi-value">74%</div>
+      <div class="kpi-sub">da capacidade da equipe</div>
+    </div>
+    <div class="kpi kpi-amber">
+      <div class="kpi-label">Projetos em Risco</div>
+      <div class="kpi-value">3</div>
+      <div class="kpi-sub">requerem atenção imediata</div>
+    </div>
+    <div class="kpi kpi-turq">
+      <div class="kpi-label">Faturabilidade</div>
+      <div class="kpi-value">68%</div>
+      <div class="kpi-sub">das horas são cobráveis</div>
+    </div>
+  </div>
+
+  <div class="grid-2" style="margin-top:14px;gap:14px;">
+    <div class="card card-sm">
+      <h3 style="font-size:12px;margin-bottom:10px;">📋 Carteira de Clientes</h3>
+      <table>
+        <thead>
+          <tr><th>Cliente</th><th>Consumo</th><th>Status</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><strong>Cliente A</strong></td><td>82%</td><td><span class="chip chip-amber">Atenção</span></td></tr>
+          <tr><td><strong>Cliente B</strong></td><td>45%</td><td><span class="chip chip-turq">Saudável</span></td></tr>
+          <tr><td><strong>Cliente C</strong></td><td>101%</td><td><span class="chip chip-red">Estourado</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="card card-sm">
+      <h3 style="font-size:12px;margin-bottom:10px;">⚡ Alertas Ativos</h3>
+      <div class="alert-item">
+        <div class="dot"></div>
+        <p><strong>Projeto X vencido</strong> — sem movimentação há 5 dias.</p>
+      </div>
+      <div class="alert-item">
+        <div class="dot amber"></div>
+        <p><strong>Contrato Y estourou</strong> — 101% do limite de horas consumido.</p>
+      </div>
+      <div class="alert-item">
+        <div class="dot amber"></div>
+        <p><strong>Equipe Z em sobrecarga</strong> — ocupação acima de 95%.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ═══════════════════════════════════════════════════════════════
+     SLIDE 5 — EQUIPES E TIMESHEET
+═══════════════════════════════════════════════════════════════ -->
+<section class="slide">
+  <div class="slide-header">
+    <div class="slide-logo">HEADSTOCK</div>
+    <div class="slide-num">05 / 10</div>
+  </div>
+
+  <div class="eyebrow">Módulo de Equipes · /agencia/equipes</div>
+  <h2>Timesheet e <span>Gestão de Pessoas</span></h2>
+  <div class="accent-line"></div>
+
+  <div class="grid-2" style="margin-top:16px;gap:20px;">
+    <div>
+      <p style="font-size:13px;margin-bottom:14px;">
+        Importe o <strong>Relatório de Timesheet do Operand</strong> e veja em segundos quem apontou o quê, quanto cada time produziu e onde estão os gargalos de capacidade.
+      </p>
+
+      <ul class="feat-list">
+        <li>
+          <div class="icon">📤</div>
+          <span><strong>Upload único</strong> — arrasta o .xlsx exportado do Operand e tudo é processado automaticamente.</span>
+        </li>
+        <li>
+          <div class="icon">👤</div>
+          <span><strong>Drill-down por colaborador</strong> — clique no time e veja horas detalhadas por pessoa, por projeto e por período.</span>
+        </li>
+        <li>
+          <div class="icon">🔄</div>
+          <span><strong>Reimportação segura</strong> — idempotente: subir o mesmo arquivo duas vezes não duplica dados.</span>
+        </li>
+        <li>
+          <div class="icon">📍</div>
+          <span><strong>Colaboradores sem conta</strong> — freelancers e externos aparecem nos apontamentos sem precisar de login.</span>
+        </li>
+        <li>
+          <div class="icon">📐</div>
+          <span><strong>Capacidade vs. Ocupação</strong> — gauge por equipe mostra sobrecarga antes de virar problema.</span>
+        </li>
+      </ul>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:10px;">
+      <div class="card card-sm" style="border-top:2px solid var(--turquesa);">
+        <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">Time de Criação</div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+          <span style="font-size:12px;color:var(--text-main);">Ana Lima</span>
+          <span style="font-size:12px;font-weight:700;color:#fff;">38.5h</span>
+        </div>
+        <div class="progress"><div class="progress-fill" style="width:88%;"></div></div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;margin-bottom:6px;">
+          <span style="font-size:12px;color:var(--text-main);">Carlos Mota</span>
+          <span style="font-size:12px;font-weight:700;color:#fff;">22.0h</span>
+        </div>
+        <div class="progress"><div class="progress-fill" style="width:52%;"></div></div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;margin-bottom:6px;">
+          <span style="font-size:12px;color:var(--text-main);">Pedro Santos</span>
+          <span style="font-size:12px;font-weight:700;color:var(--lime);">44.0h</span>
+        </div>
+        <div class="progress"><div class="progress-fill lime" style="width:100%;"></div></div>
+        <div style="font-size:10px;color:#EF4444;margin-top:4px;">⚠ Sobrecarga</div>
+      </div>
+
+      <div class="card card-sm">
+        <div style="font-size:10px;color:var(--text-muted);margin-bottom:4px;">Horas este mês</div>
+        <div style="display:flex;justify-content:space-between;">
+          <span style="font-size:20px;font-weight:800;color:#fff;">248h</span>
+          <span style="font-size:20px;font-weight:800;color:var(--text-muted);">/ 320h</span>
+        </div>
+        <div class="progress" style="margin-top:8px;height:7px;"><div class="progress-fill" style="width:77%;"></div></div>
+        <div style="font-size:10px;color:var(--text-muted);margin-top:4px;">77% da capacidade contratada</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ═══════════════════════════════════════════════════════════════
+     SLIDE 6 — CAMPANHAS
+═══════════════════════════════════════════════════════════════ -->
+<section class="slide">
+  <div class="slide-header">
+    <div class="slide-logo">HEADSTOCK</div>
+    <div class="slide-num">06 / 10</div>
+  </div>
+
+  <div class="eyebrow">Módulo de Campanhas · /agencia/campanhas</div>
+  <h2>Performance de <span>Marketing</span></h2>
+  <div class="accent-line"></div>
+
+  <div class="grid-2" style="margin-top:16px;gap:20px;">
+    <div>
+      <p style="font-size:13px;margin-bottom:14px;">
+        Cadastre campanhas, insira as métricas de cada canal e obtenha <strong>análise automática de decisão</strong> — o Headstock classifica cada campanha como <em>Escalar, Manter, Revisar ou Pausar</em>.
+      </p>
+
+      <div class="card card-sm" style="margin-bottom:12px;">
+        <table>
+          <thead><tr><th>Indicador</th><th>Valor</th></tr></thead>
+          <tbody>
+            <tr><td>Investimento Total</td><td><strong>R$ 48.000</strong></td></tr>
+            <tr><td>ROAS</td><td><strong>3.2×</strong></td></tr>
+            <tr><td>ROI</td><td><strong>+220%</strong></td></tr>
+            <tr><td>CPL</td><td><strong>R$ 38</strong></td></tr>
+            <tr><td>Taxa de Conversão</td><td><strong>4.1%</strong></td></tr>
+            <tr><td>Receita Atribuída</td><td><strong>R$ 153.600</strong></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <ul class="feat-list">
+        <li>
+          <div class="icon">📈</div>
+          <span><strong>Evolução temporal</strong> — gráfico de linha com métricas mês a mês.</span>
+        </li>
+        <li>
+          <div class="icon">🃏</div>
+          <span><strong>Card exportável em PNG</strong> — envie o resumo da campanha para o cliente em um clique.</span>
+        </li>
+      </ul>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:10px;">
+      <div class="card card-sm" style="border-left:3px solid var(--turquesa);">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+          <div>
+            <div style="font-size:13px;font-weight:700;color:#fff;">Google Ads — Brand</div>
+            <div style="font-size:10px;color:var(--text-muted);margin-top:2px;">Conversão · Abril 2026</div>
+          </div>
+          <span class="chip chip-turq">Escalar</span>
+        </div>
+        <div style="display:flex;gap:12px;margin-top:10px;">
+          <div><div style="font-size:9px;color:var(--text-muted);">ROAS</div><div style="font-size:16px;font-weight:800;color:#fff;">4.8×</div></div>
+          <div><div style="font-size:9px;color:var(--text-muted);">ROI</div><div style="font-size:16px;font-weight:800;color:#fff;">+380%</div></div>
+          <div><div style="font-size:9px;color:var(--text-muted);">CPL</div><div style="font-size:16px;font-weight:800;color:#fff;">R$ 22</div></div>
+        </div>
+      </div>
+
+      <div class="card card-sm" style="border-left:3px solid #FBBF24;">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+          <div>
+            <div style="font-size:13px;font-weight:700;color:#fff;">Meta Ads — Awareness</div>
+            <div style="font-size:10px;color:var(--text-muted);margin-top:2px;">Alcance · Abril 2026</div>
+          </div>
+          <span class="chip chip-amber">Revisar</span>
+        </div>
+        <div style="display:flex;gap:12px;margin-top:10px;">
+          <div><div style="font-size:9px;color:var(--text-muted);">ROAS</div><div style="font-size:16px;font-weight:800;color:#fff;">1.4×</div></div>
+          <div><div style="font-size:9px;color:var(--text-muted);">ROI</div><div style="font-size:16px;font-weight:800;color:#fff;">+40%</div></div>
+          <div><div style="font-size:9px;color:var(--text-muted);">CPL</div><div style="font-size:16px;font-weight:800;color:#fff;">R$ 94</div></div>
+        </div>
+      </div>
+
+      <div class="card card-sm" style="border-left:3px solid #EF4444;">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+          <div>
+            <div style="font-size:13px;font-weight:700;color:#fff;">TikTok Ads — Promoção</div>
+            <div style="font-size:10px;color:var(--text-muted);margin-top:2px;">Engajamento · Abril 2026</div>
+          </div>
+          <span class="chip chip-red">Pausar</span>
+        </div>
+        <div style="display:flex;gap:12px;margin-top:10px;">
+          <div><div style="font-size:9px;color:var(--text-muted);">ROAS</div><div style="font-size:16px;font-weight:800;color:#fff;">0.8×</div></div>
+          <div><div style="font-size:9px;color:var(--text-muted);">ROI</div><div style="font-size:16px;font-weight:800;color:#fff;">-20%</div></div>
+          <div><div style="font-size:9px;color:var(--text-muted);">CPL</div><div style="font-size:16px;font-weight:800;color:#fff;">R$ 201</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ═══════════════════════════════════════════════════════════════
+     SLIDE 7 — PROJETOS E JOBS
+═══════════════════════════════════════════════════════════════ -->
+<section class="slide">
+  <div class="slide-header">
+    <div class="slide-logo">HEADSTOCK</div>
+    <div class="slide-num">07 / 10</div>
+  </div>
+
+  <div class="eyebrow">Gestão de Projetos · Fase 3</div>
+  <h2>Projetos, Jobs e <span>Entregas</span></h2>
+  <div class="accent-line"></div>
+
+  <div class="grid-2" style="margin-top:16px;gap:20px;">
+    <div>
+      <p style="font-size:13px;margin-bottom:14px;">
+        Importe os relatórios <strong>"Projetos Pauta"</strong> e <strong>"Jobs Pauta"</strong> do Operand e tenha uma visão completa das próximas entregas, saúde dos projetos e tempo realizado por job.
+      </p>
+
+      <ul class="feat-list" style="margin-bottom:14px;">
+        <li>
+          <div class="icon">🗂</div>
+          <span><strong>Hierarquia preservada</strong> — Projeto → Jobs, exatamente como está no Operand.</span>
+        </li>
+        <li>
+          <div class="icon">🔴</div>
+          <span><strong>Alertas automáticos</strong> — projetos CRÍTICOS e VENCIDOS aparecem no topo com destaque.</span>
+        </li>
+        <li>
+          <div class="icon">📅</div>
+          <span><strong>Próximas entregas</strong> — lista dos jobs com prazo mais próximo e responsável.</span>
+        </li>
+        <li>
+          <div class="icon">⏱</div>
+          <span><strong>Tempo realizado</strong> — minutos do Operand convertidos automaticamente para horas.</span>
+        </li>
+      </ul>
+    </div>
+
+    <div>
+      <div class="card card-sm" style="margin-bottom:10px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+          <div style="font-size:13px;font-weight:700;color:#fff;">Campanha Verão</div>
+          <span class="chip chip-turq">Em andamento</span>
+        </div>
+        <div style="font-size:10px;color:var(--text-muted);margin-bottom:8px;">Cliente A · Responsável: Ana Lima</div>
+        <div class="progress" style="margin-bottom:4px;"><div class="progress-fill" style="width:65%;"></div></div>
+        <div style="font-size:10px;color:var(--text-muted);">65% concluído · Prazo: 30/06/2026</div>
+        <div class="divider" style="margin:10px 0;"></div>
+        <div style="font-size:10px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">Jobs</div>
+        <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:4px;">
+          <span style="color:var(--text-muted);">#1042 · Criação de post</span><span class="chip chip-turq" style="font-size:9px;">Aprovado</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:4px;">
+          <span style="color:var(--text-muted);">#1043 · Motion vídeo</span><span class="chip chip-amber" style="font-size:9px;">Em revisão</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:11px;">
+          <span style="color:var(--text-muted);">#1044 · Landing page</span><span class="chip" style="font-size:9px;background:rgba(100,100,100,.15);color:#666;border-color:#333;">Aguardando</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ═══════════════════════════════════════════════════════════════
+     SLIDE 8 — IMPORTAÇÃO OPERAND
+═══════════════════════════════════════════════════════════════ -->
+<section class="slide">
+  <div class="slide-header">
+    <div class="slide-logo">HEADSTOCK</div>
+    <div class="slide-num">08 / 10</div>
+  </div>
+
+  <div class="eyebrow">Integração</div>
+  <h2>Como funciona a <span>importação do Operand</span></h2>
+  <div class="accent-line"></div>
+
+  <div class="grid-2" style="margin-top:16px;gap:20px;align-items:start;">
+    <div>
+      <div style="display:flex;flex-direction:column;gap:10px;">
+        <div class="card card-sm" style="border-left:3px solid var(--turquesa);">
+          <div style="display:flex;gap:10px;align-items:center;margin-bottom:4px;">
+            <div style="width:24px;height:24px;background:var(--turquesa);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:#000;flex-shrink:0;">1</div>
+            <h3 style="font-size:12px;">Exporte no Operand</h3>
+          </div>
+          <p style="font-size:11px;">Gere o relatório de Timesheet, Jobs Pauta ou Projetos Pauta normalmente no Operand e baixe o .xlsx.</p>
+        </div>
+        <div class="card card-sm" style="border-left:3px solid var(--turquesa);">
+          <div style="display:flex;gap:10px;align-items:center;margin-bottom:4px;">
+            <div style="width:24px;height:24px;background:var(--turquesa);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:#000;flex-shrink:0;">2</div>
+            <h3 style="font-size:12px;">Faça upload no Headstock</h3>
+          </div>
+          <p style="font-size:11px;">Arraste o arquivo para a área de upload dentro do módulo de Equipes ou use o botão "Importar Operand".</p>
+        </div>
+        <div class="card card-sm" style="border-left:3px solid var(--lime);">
+          <div style="display:flex;gap:10px;align-items:center;margin-bottom:4px;">
+            <div style="width:24px;height:24px;background:var(--lime);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:#000;flex-shrink:0;">3</div>
+            <h3 style="font-size:12px;">Pronto — dados processados</h3>
+          </div>
+          <p style="font-size:11px;">O sistema detecta automaticamente o tipo de relatório, processa todas as abas e atualiza os dashboards em segundos.</p>
+        </div>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:10px;">
+      <div class="card card-sm">
+        <h3 style="font-size:12px;margin-bottom:10px;">📋 Relatórios suportados</h3>
+        <table>
+          <thead><tr><th>Aba do Operand</th><th>Processa</th></tr></thead>
+          <tbody>
+            <tr><td><strong>Relatório de Timesheet</strong></td><td>Horas por colaborador, projeto e job</td></tr>
+            <tr><td><strong>Relatório de Jobs Pauta</strong></td><td>Status, prazo, tempo realizado, responsável</td></tr>
+            <tr><td><strong>Relatório de Projetos Pauta</strong></td><td>Hierarquia projeto → jobs, situação</td></tr>
+            <tr><td><strong>Relatório de Clientes</strong></td><td>Carteira de clientes da agência</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="card card-sm" style="background:rgba(200,243,77,.04);border-color:rgba(200,243,77,.2);">
+        <div style="font-size:11px;color:var(--lime);font-weight:600;margin-bottom:6px;">✓ Importação idempotente</div>
+        <p style="font-size:11px;">Subir o mesmo arquivo duas vezes é seguro — o Headstock não duplica registros. Pode reimportar sempre que quiser atualizar os dados.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ═══════════════════════════════════════════════════════════════
+     SLIDE 9 — DASHBOARD MASTER
+═══════════════════════════════════════════════════════════════ -->
+<section class="slide">
+  <div class="slide-header">
+    <div class="slide-logo">HEADSTOCK</div>
+    <div class="slide-num">09 / 10</div>
+  </div>
+
+  <div class="eyebrow">Para o Gleison · /master</div>
+  <h2>Visão <span>Global da Plataforma</span></h2>
+  <div class="accent-line"></div>
+
+  <div class="kpi-row" style="margin-bottom:14px;">
+    <div class="kpi kpi-turq">
+      <div class="kpi-label">Agências ativas</div>
+      <div class="kpi-value">2</div>
+      <div class="kpi-sub">CRCom · Radiola WiFi</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Clientes total</div>
+      <div class="kpi-value">12</div>
+      <div class="kpi-sub">na carteira das agências</div>
+    </div>
+    <div class="kpi kpi-lime">
+      <div class="kpi-label">Horas esta semana</div>
+      <div class="kpi-value">186h</div>
+      <div class="kpi-sub">apontadas em toda plataforma</div>
+    </div>
+    <div class="kpi kpi-amber">
+      <div class="kpi-label">Alertas críticos</div>
+      <div class="kpi-value">5</div>
+      <div class="kpi-sub">requerem ação das agências</div>
+    </div>
+  </div>
+
+  <div class="grid-2" style="gap:14px;">
+    <div class="card card-sm">
+      <h3 style="font-size:12px;margin-bottom:10px;">🏢 Saúde por Agência</h3>
+      <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border-col);">
+        <div style="width:8px;height:8px;border-radius:50%;background:#4ade80;flex-shrink:0;"></div>
+        <div style="flex:1;"><div style="font-size:12px;font-weight:600;color:#fff;">CRCom</div><div style="font-size:10px;color:var(--text-muted);">6 clientes · 0 críticos</div></div>
+        <span class="chip chip-turq">Normal</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;padding:8px 0;">
+        <div style="width:8px;height:8px;border-radius:50%;background:#FBBF24;flex-shrink:0;"></div>
+        <div style="flex:1;"><div style="font-size:12px;font-weight:600;color:#fff;">Radiola WiFi</div><div style="font-size:10px;color:var(--text-muted);">4 clientes · 2 em atenção</div></div>
+        <span class="chip chip-amber">Atenção</span>
+      </div>
+    </div>
+
+    <div class="card card-sm">
+      <h3 style="font-size:12px;margin-bottom:10px;">📨 Cards Executivos</h3>
+      <p style="font-size:11.5px;margin-bottom:10px;">O Master pode enviar alertas e orientações diretamente para o dashboard do CEO de cada agência.</p>
+      <div style="padding:8px 10px;background:rgba(0,184,198,.06);border:1px solid rgba(0,184,198,.2);border-radius:6px;font-size:11px;color:var(--text-muted);">
+        <strong style="color:var(--turquesa);">Para: CRCom</strong><br/>
+        "Projeto Verão está há 5 dias sem movimentação. Cliente sinalizou preocupação."
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ═══════════════════════════════════════════════════════════════
+     SLIDE 10 — ROADMAP
+═══════════════════════════════════════════════════════════════ -->
+<section class="slide">
+  <div class="slide-header">
+    <div class="slide-logo">HEADSTOCK</div>
+    <div class="slide-num">10 / 10</div>
+  </div>
+
+  <div class="eyebrow">Roadmap</div>
+  <h2>O que já está pronto e <span>o que vem a seguir</span></h2>
+  <div class="accent-line"></div>
+
+  <div class="timeline">
+    <div class="tl-item">
+      <div class="tl-dot done"></div>
+      <div class="tl-content">
+        <div class="tl-phase done">Fase 1 · Entregue</div>
+        <div class="tl-title">Equipes & Timesheet</div>
+        <div class="tl-desc">Importação do Operand, horas por colaborador, ocupação e capacidade de equipe, drill-down individual.</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-dot done"></div>
+      <div class="tl-content">
+        <div class="tl-phase done">Fase 3 · Entregue</div>
+        <div class="tl-title">Projetos & Jobs</div>
+        <div class="tl-desc">Importação de projetos e jobs do Operand, alertas de prazo, progresso e saúde por projeto.</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-dot done"></div>
+      <div class="tl-content">
+        <div class="tl-phase done">Concluído</div>
+        <div class="tl-title">Campanhas & Performance</div>
+        <div class="tl-desc">Dashboard de mídia, KPIs de campanha, decisão automática (Escalar / Revisar / Pausar), card exportável.</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-dot next"></div>
+      <div class="tl-content">
+        <div class="tl-phase next">Fase 2 · Próximo</div>
+        <div class="tl-title">Financeiro via API</div>
+        <div class="tl-desc">Integração com API do Operand para receita, custos operacionais e margem de contribuição em tempo real.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="divider" style="margin-top:22px;"></div>
+
+  <div class="grid-3" style="margin-top:16px;gap:10px;">
+    <div class="card card-sm" style="text-align:center;">
+      <div style="font-size:22px;margin-bottom:6px;">⚡</div>
+      <h3 style="font-size:12px;margin-bottom:4px;">Stack moderna</h3>
+      <p style="font-size:10.5px;">Next.js 16 · PostgreSQL · Prisma · TypeScript · Tailwind</p>
+    </div>
+    <div class="card card-sm" style="text-align:center;">
+      <div style="font-size:22px;margin-bottom:6px;">🔒</div>
+      <h3 style="font-size:12px;margin-bottom:4px;">Multi-tenant seguro</h3>
+      <p style="font-size:10.5px;">Cada agência vê somente seus próprios dados. Isolamento total por empresa.</p>
+    </div>
+    <div class="card card-sm" style="text-align:center;">
+      <div style="font-size:22px;margin-bottom:6px;">☁</div>
+      <h3 style="font-size:12px;margin-bottom:4px;">Pronto para deploy</h3>
+      <p style="font-size:10.5px;">Arquitetura preparada para subir na Vercel ou AWS com zero mudanças de código.</p>
+    </div>
+  </div>
+
+  <div style="margin-top:20px;text-align:center;">
+    <div style="font-size:11px;color:var(--text-muted);margin-bottom:8px;">Acesso de demonstração</div>
+    <div style="display:inline-flex;gap:16px;">
+      <div style="background:var(--card-dark);border:1px solid var(--border-col);border-radius:8px;padding:8px 16px;font-size:12px;">
+        <span style="color:var(--text-muted);">CEO Agência: </span>
+        <strong style="color:var(--turquesa);">celso@crcom.com</strong>
+      </div>
+      <div style="background:var(--card-dark);border:1px solid var(--border-col);border-radius:8px;padding:8px 16px;font-size:12px;">
+        <span style="color:var(--text-muted);">Senha: </span>
+        <strong style="color:var(--text-main);">123456</strong>
+      </div>
+    </div>
+  </div>
+</section>
+
+</div><!-- /slides-wrapper -->
+
+<script>
+  // smooth scroll to slide on nav click
+  document.querySelectorAll('.nav button:not(.print-btn)').forEach((btn, i) => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.slide')[i]?.scrollIntoView({ behavior: 'smooth' });
+    });
+  });
+</script>
+</body>
+</html>

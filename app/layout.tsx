@@ -16,6 +16,10 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Headstock",
   description: "Inteligência gerencial para decisões melhores",
+  icons: {
+    icon: "/logo-branca.png",
+    apple: "/logo-branca.png",
+  },
 };
 
 export default function RootLayout({
