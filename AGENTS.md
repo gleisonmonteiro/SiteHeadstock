@@ -26,6 +26,98 @@ Redirect pós-login: `MASTER_PLATFORM`/`MASTER_CONSULTANT` → `/master`; `AGENC
 
 ---
 
+## Protocolo para Agentes de IA
+
+### Sequência de leitura por tipo de tarefa
+
+Nunca leia arquivos aleatoriamente. Siga a ordem abaixo antes de escrever qualquer código.
+
+| Tarefa | 1º | 2º | 3º |
+|--------|----|----|-----|
+| Novo campo no banco | grep pelo model em `prisma/schema.prisma` | service que usa o model | — |
+| Nova rota de API | rota existente do mesmo domínio como padrão | service correspondente | — |
+| Nova feature de agência | service mais próximo (equipe, campanha) | `prisma/schema.prisma` nos models relevantes | — |
+| Bug em rota | a rota com erro | seu service direto | — |
+| Mudança de UI | service que alimenta a página | rota de API correspondente | page.tsx |
+
+**Regra de ouro:** leia o service antes do page.tsx. O service tem a lógica real em ~200 linhas; o page.tsx tem ~800 linhas de JSX.
+
+---
+
+### Como evitar alucinações
+
+**Prisma**
+- O import é `from "../../.generated/client"` — **nunca** `from "@prisma/client"`. Verifique o import em qualquer service existente antes de criar um novo arquivo.
+- Antes de usar qualquer campo, grep o model em `prisma/schema.prisma`. Campos que parecem óbvios podem não existir. Ex.: `ApontamentoHora` não tem `horasTotais` — tem `horas`.
+- `usuarioId` em `ApontamentoHora` é `String?` (opcional). Guards `if (apontamento.usuarioId)` são obrigatórios.
+- Após alterar o schema, sempre rodar `npx prisma generate` antes de usar o client.
+
+**Next.js 16 / App Router**
+- Nunca `export default` em rotas — apenas `export async function GET` / `POST`.
+- `cookies()` é assíncrono. Não reimplemente — use `exigirUsuarioSessao()` de `session.ts`.
+- Body de request: leia `await request.json()` uma única vez e armazene em variável.
+
+**Banco de dados**
+- **Nunca `npx prisma migrate dev`** — o banco tem drift histórico e o comando falha. Use sempre `npx prisma db push --accept-data-loss`.
+
+**Papéis e acesso**
+- Não invente lógica de papel inline. Use `app/lib/access.ts`. Se a função necessária não existir, adicione-a lá.
+- Toda query deve filtrar por `empresaId` ou `agenciaId`. Esquecer esse filtro expõe dados cross-empresa silenciosamente.
+
+---
+
+### Arquitetura de memória entre sessões
+
+O contexto não persiste entre sessões. Use esta hierarquia para reconstruir rapidamente:
+
+```
+AGENTS.md                       ← âncora obrigatória — leia sempre primeiro
+  └── prisma/schema.prisma      ← source of truth para shapes de dados
+        └── app/services/       ← lógica de negócio, leia por domínio
+              └── app/api/      ← contrato HTTP (leia só para ver assinatura)
+                    └── app/**/page.tsx  ← só quando for alterar UI
+```
+
+**Para retomar uma tarefa interrompida:**
+1. Releia este arquivo (AGENTS.md).
+2. Grep pelo símbolo ou model que estava sendo modificado.
+3. Leia apenas o arquivo alvo — não leia vizinhos "por precaução".
+
+**Não carregue em contexto por inferência (sempre verifique):**
+- Nomes de campos do Prisma — grep no schema antes de usar.
+- Assinatura de funções de service — grep no arquivo antes de chamar.
+- Rotas existentes — consulte a tabela de arquivos-chave neste documento.
+
+---
+
+### Redução de tokens
+
+**Leia por partes, não arquivos inteiros**
+
+`prisma/schema.prisma` tem ~300 linhas — grep pelo model e leia só aquele bloco:
+```
+grep -A 35 "^model ApontamentoHora" prisma/schema.prisma
+```
+
+Para encontrar onde um model é usado:
+```
+grep -rl "ApontamentoHora" app/services/
+```
+
+Para localizar uma função específica:
+```
+grep -n "obterEquipeDetalhe" app/services/equipeService.ts
+```
+
+**Arquivos para evitar salvo necessidade explícita**
+- `node_modules/` — nunca.
+- `app/**/page.tsx` — só para mudanças de UI; use offset/limit para ler só a seção relevante.
+- `README.md` — setup e deploy, sem lógica de negócio.
+- `COMO-TESTAR.md` — só para entender fluxos manuais de teste.
+- `prisma/seed-*.ts` — só para adicionar ou ajustar dados de demo.
+
+---
+
 ## Stack e convenções
 
 - **Next.js 16 App Router** — as APIs podem divergir do treinamento. Leia `node_modules/next/dist/docs/` antes de criar rotas novas.
