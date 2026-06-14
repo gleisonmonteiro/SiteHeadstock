@@ -120,7 +120,7 @@ A opção **Planilha TOTVS** começa desmarcada. Quando marcada e uma importaç�
 realizada, a preferência fica salva na empresa e aparece marcada nos próximos
 acessos.
 
-As consultas TOTVS de referência estão em `C:\Codex\Rubiart`:
+As consultas TOTVS de referência estão em `C:\Codex\Headstock`:
 
 - `venda.txt`
 - `bi_produto.txt`

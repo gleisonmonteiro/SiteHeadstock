@@ -3,7 +3,7 @@
 ## Preparar
 
 ```powershell
-cd C:\Codex\Rubiart\rubiart
+cd C:\Codex\Headstock\headstock
 npm install
 npx prisma generate
 npx prisma db push --accept-data-loss

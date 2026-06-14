@@ -2,14 +2,14 @@
  * Gera modelos Excel para upload dos módulos:
  * Produtos, Estoque, Contas a Pagar, Contas a Receber, Vendas
  *
- * Saída: c:\Codex\Rubiart\modelos-upload\
+ * Saída: c:\Codex\Headstock\modelos-upload\
  */
 
 import * as XLSX from "xlsx";
 import path from "path";
 import fs from "fs";
 
-const OUTPUT_DIR = path.join("c:\\Codex\\Rubiart", "modelos-upload");
+const OUTPUT_DIR = path.join("c:\\Codex\\Headstock", "modelos-upload");
 fs.mkdirSync(OUTPUT_DIR, { recursive: true });
 
 function wb(sheets: { nome: string; dados: Record<string, unknown>[] }[]) {
