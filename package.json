@@ -1,17 +1,33 @@
 {
-  "name": "rubiart",
+  "name": "headstock",
   "version": "0.1.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "db:seed": "tsx prisma/seed.ts",
+    "db:bootstrap": "tsx prisma/bootstrap-headstock.ts",
+    "db:setup-usuarios": "tsx prisma/setup-usuarios.ts",
+    "db:seed-fcm": "tsx prisma/seed-fcm.ts",
+    "db:seed-cholet": "tsx prisma/seed-cholet.ts",
+    "db:seed-radiolawifi-clientes": "tsx prisma/seed-radiolawifi-clientes.ts",
+    "db:seed-crcom-equipes": "tsx prisma/seed-crcom-equipes.ts"
   },
   "dependencies": {
+    "@prisma/adapter-pg": "^7.8.0",
+    "@prisma/client": "^7.8.0",
+    "bcryptjs": "^3.0.3",
+    "js-cookie": "^3.0.8",
     "next": "16.2.7",
+    "next-themes": "^0.4.6",
+    "pg": "^8.21.0",
+    "prisma": "^7.8.0",
     "react": "19.2.4",
-    "react-dom": "19.2.4"
+    "react-dom": "19.2.4",
+    "recharts": "^3.8.1",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
@@ -21,6 +37,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.2.7",
     "tailwindcss": "^4",
+    "tsx": "^4.22.4",
     "typescript": "^5"
   }
 }

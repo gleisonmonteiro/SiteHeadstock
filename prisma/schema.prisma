@@ -1,0 +1,676 @@
+generator client {
+  provider = "prisma-client"
+  output = "../.generated"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum TipoEmpresa {
+  AGENCIA
+  VAREJO
+  SERVICOS
+  OUTRA
+}
+
+enum PapelUsuario {
+  MASTER_PLATFORM
+  MASTER_CONSULTANT
+  COMPANY_OWNER
+  AGENCY_CEO
+  AGENCY_MANAGER
+  COLLABORATOR
+  COMPANY_MANAGER
+  DATA_OPERATOR
+  VIEWER
+}
+
+enum StatusRelacionamento {
+  PENDENTE
+  ATIVO
+  SUSPENSO
+  REVOGADO
+  ENCERRADO
+}
+
+enum StatusProjeto {
+  PLANEJAMENTO
+  EM_ANDAMENTO
+  PAUSADO
+  CONCLUIDO
+  CANCELADO
+}
+
+enum SaudeProjeto {
+  NORMAL
+  ATENCAO
+  CRITICO
+}
+
+enum StatusApontamento {
+  RASCUNHO
+  ENVIADO
+  APROVADO
+  REJEITADO
+}
+
+enum StatusOP {
+  AGUARDANDO
+  EM_ANDAMENTO
+  CONCLUIDA
+  CANCELADA
+}
+
+model Empresa {
+  id           String      @id @default(cuid())
+  nome         String
+  nomeFantasia String?
+  slug         String?     @unique
+  tipo         TipoEmpresa @default(VAREJO)
+  status       String      @default("ativo")
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  usuarios                   Usuario[]
+  uploads                    Upload[]
+  vendas                     Venda[]
+  metas                      Meta[]
+  metasVendedor              MetaVendedor[]
+  cardsExecutivos            CardExecutivo[]
+  comprovantesOCR            ComprovanteOCR[]
+  movimentosOCR              MovimentoOCR[]
+  equipes                    Equipe[]
+  projetos                   Projeto[]
+  apontamentosHora           ApontamentoHora[]
+  jobs                       Job[]
+  clientesAssistidos         ClienteAgencia[]       @relation("AgenciaClientes")
+  cadastrosComoEmpresa       ClienteAgencia[]       @relation("EmpresaConectadaCliente")
+  relacionamentosComoAgencia RelacionamentoGestao[] @relation("AgenciaRelacionamentos")
+  relacionamentosComoCliente RelacionamentoGestao[] @relation("ClienteRelacionamentos")
+  produtos                   ProdutoCatalogo[]
+  itensEstoque               ItemEstoque[]
+  contasPagar                ContaPagar[]
+  contasReceber              ContaReceber[]
+  programacoesOP             ProgramacaoOP[]
+  ordensProducao             OrdemProducao[]
+
+  @@map("empresas")
+}
+
+model Usuario {
+  id        String   @id @default(cuid())
+  nome      String
+  email     String
+  senhaHash String
+  status    String   @default("ativo")
+  papel     PapelUsuario @default(COMPANY_OWNER)
+  empresaId String
+  empresa   Empresa  @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tokenssSenha          TokenSenha[]
+  equipesGerenciadas    Equipe[]             @relation("GestorEquipe")
+  equipes               EquipeMembro[]
+  clientesResponsavel   ClienteAgencia[]     @relation("ResponsavelCliente")
+  projetosResponsavel   Projeto[]            @relation("ResponsavelProjeto")
+  apontamentosHora      ApontamentoHora[]
+  atualizacoesProjeto   AtualizacaoProjeto[]
+  ordensProducaoCriadas OrdemProducao[]      @relation("CriadorOP")
+  movimentacoesOP       MovimentacaoOP[]
+
+  @@unique([email])
+  @@map("usuarios")
+}
+
+model RelacionamentoGestao {
+  id               String              @id @default(cuid())
+  agenciaId        String
+  agencia          Empresa             @relation("AgenciaRelacionamentos", fields: [agenciaId], references: [id], onDelete: Cascade)
+  empresaClienteId String
+  empresaCliente   Empresa             @relation("ClienteRelacionamentos", fields: [empresaClienteId], references: [id], onDelete: Cascade)
+  status           StatusRelacionamento @default(PENDENTE)
+  escopos          String[]            @default([])
+  inicioEm         DateTime?
+  fimEm            DateTime?
+  autorizadoEm     DateTime?
+  revogadoEm       DateTime?
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+
+  @@unique([agenciaId, empresaClienteId])
+  @@index([empresaClienteId, status])
+  @@map("relacionamentos_gestao")
+}
+
+model Equipe {
+  id        String   @id @default(cuid())
+  empresaId String
+  empresa   Empresa  @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  nome      String
+  gestorId  String?
+  gestor    Usuario? @relation("GestorEquipe", fields: [gestorId], references: [id], onDelete: SetNull)
+  status    String   @default("ativa")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  membros  EquipeMembro[]
+  projetos Projeto[]
+
+  @@unique([empresaId, nome])
+  @@index([gestorId])
+  @@map("equipes")
+}
+
+model EquipeMembro {
+  id                String   @id @default(cuid())
+  equipeId          String
+  equipe            Equipe   @relation(fields: [equipeId], references: [id], onDelete: Cascade)
+  usuarioId         String
+  usuario           Usuario  @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  funcao            String?
+  capacidadeSemanal Float    @default(40)
+  custoHora         Float?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@unique([equipeId, usuarioId])
+  @@index([usuarioId])
+  @@map("equipe_membros")
+}
+
+model ClienteAgencia {
+  id                 String   @id @default(cuid())
+  agenciaId          String
+  agencia            Empresa  @relation("AgenciaClientes", fields: [agenciaId], references: [id], onDelete: Cascade)
+  empresaConectadaId String?
+  empresaConectada   Empresa? @relation("EmpresaConectadaCliente", fields: [empresaConectadaId], references: [id], onDelete: SetNull)
+  nome               String
+  documento          String?
+  status             String   @default("ativo")
+  responsavelId      String?
+  responsavel        Usuario? @relation("ResponsavelCliente", fields: [responsavelId], references: [id], onDelete: SetNull)
+  contratoValor      Float?
+  horasContratadas   Float?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  projetos         Projeto[]
+  apontamentosHora ApontamentoHora[]
+  jobs             Job[]
+
+  @@unique([agenciaId, nome])
+  @@unique([agenciaId, empresaConectadaId])
+  @@index([responsavelId])
+  @@map("clientes_agencia")
+}
+
+model Projeto {
+  id                 String        @id @default(cuid())
+  agenciaId          String
+  agencia            Empresa       @relation(fields: [agenciaId], references: [id], onDelete: Cascade)
+  clienteId          String
+  cliente            ClienteAgencia @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  equipeId           String?
+  equipe             Equipe?       @relation(fields: [equipeId], references: [id], onDelete: SetNull)
+  responsavelId      String?
+  responsavel        Usuario?      @relation("ResponsavelProjeto", fields: [responsavelId], references: [id], onDelete: SetNull)
+  nome               String
+  status             StatusProjeto @default(PLANEJAMENTO)
+  saude              SaudeProjeto  @default(NORMAL)
+  progresso          Int           @default(0)
+  dataInicio         DateTime?
+  prazo              DateTime?
+  horasPrevistas     Float?
+  proximaEntrega     String?
+  dataProximaEntrega DateTime?
+  impedimento        String?
+  idExterno          String?
+  fonteImportacao    String?
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+
+  apontamentos ApontamentoHora[]
+  atualizacoes AtualizacaoProjeto[]
+  jobs         Job[]
+
+  @@unique([agenciaId, idExterno])
+  @@index([agenciaId, status])
+  @@index([clienteId])
+  @@index([responsavelId])
+  @@map("projetos")
+}
+
+model AtualizacaoProjeto {
+  id                 String       @id @default(cuid())
+  projetoId          String
+  projeto            Projeto      @relation(fields: [projetoId], references: [id], onDelete: Cascade)
+  autorId            String
+  autor              Usuario      @relation(fields: [autorId], references: [id], onDelete: Restrict)
+  progresso          Int
+  saude              SaudeProjeto
+  proximaEntrega     String?
+  dataProximaEntrega DateTime?
+  impedimento        String?
+  createdAt          DateTime     @default(now())
+
+  @@index([projetoId, createdAt])
+  @@map("atualizacoes_projeto")
+}
+
+model ApontamentoHora {
+  id              String            @id @default(cuid())
+  agenciaId       String
+  agencia         Empresa           @relation(fields: [agenciaId], references: [id], onDelete: Cascade)
+  usuarioId       String?
+  usuario         Usuario?          @relation(fields: [usuarioId], references: [id], onDelete: SetNull)
+  nomeColaborador String            @default("")
+  clienteId       String?
+  cliente         ClienteAgencia?   @relation(fields: [clienteId], references: [id], onDelete: SetNull)
+  projetoId       String?
+  projeto         Projeto?          @relation(fields: [projetoId], references: [id], onDelete: SetNull)
+  data            DateTime          @db.Date
+  horas           Float
+  tipoAtividade   String            @default("geral")
+  faturavel       Boolean           @default(true)
+  observacao      String?
+  status          StatusApontamento @default(APROVADO)
+  idExterno       String?
+  fonteImportacao String?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  @@unique([agenciaId, idExterno])
+  @@index([agenciaId, data])
+  @@index([agenciaId, nomeColaborador, data])
+  @@index([usuarioId, data])
+  @@index([projetoId])
+  @@map("apontamentos_hora")
+}
+
+model TokenSenha {
+  id        String   @id @default(cuid())
+  usuarioId String
+  usuario   Usuario  @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  token     String   @unique
+  expiraEm  DateTime
+  usado     Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@map("tokens_senha")
+}
+
+model Upload {
+  id               String   @id @default(cuid())
+  empresaId        String
+  empresa          Empresa  @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  nomeArquivo      String
+  tipo             String
+  status           String   @default("sucesso")
+  totalLinhas      Int
+  linhasImportadas Int
+  linhasErro       Int
+  createdAt        DateTime @default(now())
+
+  vendas Venda[]
+
+  @@map("uploads")
+}
+
+model Venda {
+  id              String   @id @default(cuid())
+  empresaId       String
+  empresa         Empresa  @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  uploadId        String
+  upload          Upload   @relation(fields: [uploadId], references: [id], onDelete: Cascade)
+  dataVenda       DateTime
+  valorVenda      Float
+  produto         String
+  quantidade      Int
+  vendedor        String
+  cliente         String?
+  formaPagamento  String?
+  categoria       String?
+  marca           String?
+  custo           Float?
+  loja            String?
+  canalVenda      String?
+  desconto        Float?
+  // Campos extras do TOTVS (venda.txt)
+  cdProduto       String?
+  nrTransacao     String?
+  vlBruto         Float?
+  tpSituacao      String?
+  cdSeqgrupo      String?
+  createdAt       DateTime @default(now())
+
+  @@index([empresaId, dataVenda])
+  @@index([empresaId, loja])
+  @@map("vendas")
+}
+
+model Meta {
+  id        String   @id @default(cuid())
+  empresaId String
+  empresa   Empresa  @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  mes       Int
+  ano       Int
+  valorMeta Float
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([empresaId, mes, ano])
+  @@map("metas")
+}
+
+model MetaVendedor {
+  id        String   @id @default(cuid())
+  empresaId String
+  empresa   Empresa  @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  vendedor  String
+  mes       Int
+  ano       Int
+  valorMeta Float
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([empresaId, vendedor, mes, ano])
+  @@map("metas_vendedor")
+}
+
+model CardExecutivo {
+  id              String   @id @default(cuid())
+  empresaId       String
+  empresa         Empresa  @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  tipo            String
+  dataReferencia  DateTime
+  mensagem        String   @db.Text
+  createdAt       DateTime @default(now())
+
+  @@map("cards_executivos")
+}
+
+model ComprovanteOCR {
+  id             String   @id @default(cuid())
+  empresaId      String
+  empresa        Empresa  @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  nomeArquivo    String
+  urlArquivo     String
+  textoExtraido  String   @db.Text
+  status         String   @default("pendente_confirmacao")
+  confianca      Float?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  movimentos MovimentoOCR[]
+
+  @@map("comprovantes_ocr")
+}
+
+model MovimentoOCR {
+  id               String   @id @default(cuid())
+  empresaId        String
+  empresa          Empresa  @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  comprovanteOCRId String
+  comprovanteOCR   ComprovanteOCR @relation(fields: [comprovanteOCRId], references: [id], onDelete: Cascade)
+  dataMovimento    DateTime
+  valor            Float
+  fornecedor       String
+  documento        String?
+  descricao        String?
+  formaPagamento   String?
+  categoria        String?
+  tipoSugerido     String?
+  status           String   @default("confirmado")
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@map("movimentos_ocr")
+}
+
+// ──────────────────────────────────────────────
+// Módulo: Produtos e Mix (bi_produto.txt)
+// ──────────────────────────────────────────────
+model ProdutoCatalogo {
+  id           String   @id @default(cuid())
+  empresaId    String
+  empresa      Empresa  @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  cdProduto    String
+  referencia   String?
+  descricao    String
+  descricaoSku String?
+  cdCor        String?
+  cor          String?
+  cdTam        String?
+  tamanho      String?
+  setor        String?
+  departamento String?
+  genero       String?
+  marca        String?
+  grupo        String?
+  subgrupo     String?
+  linha        String?
+  secao        String?
+  reposicao    String?
+  vlVenda      Float?
+  vlCusto      Float?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  itensEstoque ItemEstoque[]
+
+  @@unique([empresaId, cdProduto])
+  @@index([empresaId, marca])
+  @@index([empresaId, grupo])
+  @@map("produtos_catalogo")
+}
+
+// ──────────────────────────────────────────────
+// Módulo: Estoque e Abastecimento (estoque.txt)
+// ──────────────────────────────────────────────
+model ItemEstoque {
+  id         String           @id @default(cuid())
+  empresaId  String
+  empresa    Empresa          @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  produtoId  String?
+  produto    ProdutoCatalogo? @relation(fields: [produtoId], references: [id], onDelete: SetNull)
+  cdProduto  String
+  loja       String?
+  dataRef    DateTime         @db.Date
+  estoque    Float            @default(0)
+  vlVenda    Float?
+  vlCusto    Float?
+  createdAt  DateTime         @default(now())
+  updatedAt  DateTime         @updatedAt
+
+  @@unique([empresaId, cdProduto, loja, dataRef])
+  @@index([empresaId, dataRef])
+  @@index([empresaId, loja])
+  @@map("itens_estoque")
+}
+
+// ──────────────────────────────────────────────
+// Módulo: Contas a Pagar (contas a pagar.txt)
+// ──────────────────────────────────────────────
+model ContaPagar {
+  id           String    @id @default(cuid())
+  empresaId    String
+  empresa      Empresa   @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  loja         String?
+  fornecedor   String
+  cdFornecedor String?
+  nrDuplicata  String?
+  nrParcela    String?
+  dtEmissao    DateTime?
+  dtVencimento DateTime
+  dtBaixa      DateTime?
+  tpSituacao   String    @default("N")
+  tpDocumento  String?
+  tpBaixa      String?
+  vlDuplicata  Float
+  vlOriginal   Float?
+  vlPago       Float?
+  vlDesconto   Float?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([empresaId, dtVencimento])
+  @@index([empresaId, tpSituacao])
+  @@map("contas_pagar")
+}
+
+// ──────────────────────────────────────────────
+// Módulo: Jobs (tarefas do Operand)
+// ──────────────────────────────────────────────
+model Job {
+  id              String          @id @default(cuid())
+  agenciaId       String
+  agencia         Empresa         @relation(fields: [agenciaId], references: [id], onDelete: Cascade)
+  projetoId       String?
+  projeto         Projeto?        @relation(fields: [projetoId], references: [id], onDelete: SetNull)
+  clienteId       String?
+  cliente         ClienteAgencia? @relation(fields: [clienteId], references: [id], onDelete: SetNull)
+  nomeResponsavel String?
+  idExterno       String?
+  nome            String
+  etapa           String?
+  status          String          @default("aberto")
+  prazo           DateTime?       @db.Date
+  categoria       String?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  @@unique([agenciaId, idExterno])
+  @@index([agenciaId, status])
+  @@index([projetoId])
+  @@map("jobs")
+}
+
+// ──────────────────────────────────────────────
+// Módulo: Produção — Ordens de Produção (OPs)
+// ──────────────────────────────────────────────
+
+model ProgramacaoOP {
+  id        String   @id @default(cuid())
+  empresaId String
+  empresa   Empresa  @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  nome      String
+  ativo     Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  etapas EtapaProgramacao[]
+  ordens OrdemProducao[]
+
+  @@unique([empresaId, nome])
+  @@map("programacoes_op")
+}
+
+model EtapaProgramacao {
+  id            String        @id @default(cuid())
+  programacaoId String
+  programacao   ProgramacaoOP @relation(fields: [programacaoId], references: [id], onDelete: Cascade)
+  nome          String
+  ordem         Int
+  descricao     String?
+  createdAt     DateTime      @default(now())
+
+  movimentacoes MovimentacaoOP[]
+
+  @@unique([programacaoId, ordem])
+  @@index([programacaoId])
+  @@map("etapas_programacao")
+}
+
+model OrdemProducao {
+  id            String        @id @default(cuid())
+  empresaId     String
+  empresa       Empresa       @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  programacaoId String
+  programacao   ProgramacaoOP @relation(fields: [programacaoId], references: [id])
+  numero        String
+  referencia    String?
+  produto       String
+  genero        String?
+  oficina       String?
+  qtdTotal      Int           @default(0)
+  custoTotal    Float         @default(0)
+  status        StatusOP      @default(EM_ANDAMENTO)
+  etapaAtualId  String?
+  criadoPorId   String?
+  criadoPor     Usuario?      @relation("CriadorOP", fields: [criadoPorId], references: [id], onDelete: SetNull)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  itens         ItemOP[]
+  movimentacoes MovimentacaoOP[]
+
+  @@unique([empresaId, numero])
+  @@index([empresaId, status])
+  @@map("ordens_producao")
+}
+
+model ItemOP {
+  id         String        @id @default(cuid())
+  opId       String
+  op         OrdemProducao @relation(fields: [opId], references: [id], onDelete: Cascade)
+  cor        String?
+  tamanho    String?
+  quantidade Int           @default(0)
+  custoUnit  Float         @default(0)
+  custoTotal Float         @default(0)
+  createdAt  DateTime      @default(now())
+
+  @@index([opId])
+  @@map("itens_op")
+}
+
+model MovimentacaoOP {
+  id                  String           @id @default(cuid())
+  opId                String
+  op                  OrdemProducao    @relation(fields: [opId], references: [id], onDelete: Cascade)
+  etapaId             String
+  etapa               EtapaProgramacao @relation(fields: [etapaId], references: [id])
+  dataEntrada         DateTime
+  dataSaida           DateTime?
+  dataPrevisaoRetorno DateTime?
+  usuarioId           String?
+  usuario             Usuario?         @relation(fields: [usuarioId], references: [id], onDelete: SetNull)
+  observacao          String?
+  createdAt           DateTime         @default(now())
+
+  @@index([opId])
+  @@index([etapaId])
+  @@map("movimentacoes_op")
+}
+
+// ──────────────────────────────────────────────
+// Módulo: Contas a Receber (contas a receber.txt)
+// ──────────────────────────────────────────────
+model ContaReceber {
+  id           String    @id @default(cuid())
+  empresaId    String
+  empresa      Empresa   @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  loja         String?
+  cdCliente    String?
+  nmCliente    String
+  nrFat        String?
+  nrParcela    String?
+  dtEmissao    DateTime?
+  dtVencimento DateTime
+  dtBaixa      DateTime?
+  tpSituacao   String    @default("1")
+  tpDocumento  String?
+  tpBaixa      String?
+  vlFatura     Float
+  vlOriginal   Float?
+  vlPago       Float?
+  vlDesconto   Float?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([empresaId, dtVencimento])
+  @@index([empresaId, tpSituacao])
+  @@map("contas_receber")
+}
