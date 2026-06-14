@@ -1,10 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { exigirUsuarioSessao, respostaErroApi } from "@/lib/session";
+import { exigirAcessoDecisao } from "@/lib/access";
 import { salvarMetaVendedor } from "@/services/metaService";
 
 export async function POST(request: NextRequest) {
   try {
-    const { empresaId } = await exigirUsuarioSessao(request);
+    const usuario = await exigirUsuarioSessao(request);
+    exigirAcessoDecisao(usuario.papel);
+    const { empresaId } = usuario;
     const { vendedor, mes, ano, valorMeta } = await request.json();
 
     if (!vendedor || !mes || !ano || !valorMeta) {

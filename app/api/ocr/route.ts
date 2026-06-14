@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { exigirUsuarioSessao, respostaErroApi } from "@/lib/session";
+import { exigirAcessoDecisao } from "@/lib/access";
 import {
   criarComprovanteOCR,
   obterComprovantesOCR,
@@ -8,7 +9,9 @@ import {
 
 export async function POST(request: NextRequest) {
   try {
-    const { empresaId } = await exigirUsuarioSessao(request);
+    const usuario = await exigirUsuarioSessao(request);
+    exigirAcessoDecisao(usuario.papel);
+    const { empresaId } = usuario;
     const formData = await request.formData();
     const imagem = formData.get("imagem") as File;
 
@@ -56,7 +59,9 @@ export async function POST(request: NextRequest) {
 
 export async function GET(request: NextRequest) {
   try {
-    const { empresaId } = await exigirUsuarioSessao(request);
+    const usuario = await exigirUsuarioSessao(request);
+    exigirAcessoDecisao(usuario.papel);
+    const { empresaId } = usuario;
     const tipo = request.nextUrl.searchParams.get("tipo");
     const comprovantes =
       tipo === "pendentes"

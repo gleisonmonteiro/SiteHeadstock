@@ -5,10 +5,13 @@ import {
   gerarCardFechamento,
   obterCardsExecutivos,
 } from "@/services/cardExecutivoService";
+import { exigirAcessoDecisao } from "@/lib/access";
 
 export async function POST(request: NextRequest) {
   try {
-    const { empresaId } = await exigirUsuarioSessao(request);
+    const usuario = await exigirUsuarioSessao(request);
+    exigirAcessoDecisao(usuario.papel);
+    const { empresaId } = usuario;
     const { tipo } = await request.json();
 
     if (!tipo) {
@@ -38,7 +41,9 @@ export async function POST(request: NextRequest) {
 
 export async function GET(request: NextRequest) {
   try {
-    const { empresaId } = await exigirUsuarioSessao(request);
+    const usuario = await exigirUsuarioSessao(request);
+    exigirAcessoDecisao(usuario.papel);
+    const { empresaId } = usuario;
     const tipo = request.nextUrl.searchParams.get("tipo");
     const cards = await obterCardsExecutivos(empresaId, tipo || undefined);
     return NextResponse.json({ cards });

@@ -10,6 +10,7 @@ import {
   normalizarLinhaVendaTotvs,
 } from "@/services/importModulosService";
 import { importarVendas } from "@/services/importVendasService";
+import { exigirAcessoImportacao } from "@/lib/access";
 
 // Mapeamento de nomes de aba para módulo
 const ABA_MODULO: Record<string, string> = {
@@ -42,9 +43,12 @@ function identificarModulo(nomeAba: string): string | null {
 
 export async function POST(request: NextRequest) {
   try {
-    const { empresaId } = await exigirUsuarioSessao(request);
+    const usuario = await exigirUsuarioSessao(request);
+    exigirAcessoImportacao(usuario.papel);
+    const { empresaId } = usuario;
     const formData = await request.formData();
     const arquivo = formData.get("arquivo") as File;
+    const usaTotvs = formData.get("usaTotvs") === "true";
 
     if (!arquivo) {
       return NextResponse.json({ erro: "Arquivo é obrigatório" }, { status: 400 });
@@ -60,6 +64,13 @@ export async function POST(request: NextRequest) {
 
     const buffer = await arquivo.arrayBuffer();
     const workbook = XLSX.read(buffer, { type: "buffer" });
+
+    if (usaTotvs && !usuario.empresa.usaTotvs) {
+      await prisma.empresa.update({
+        where: { id: empresaId },
+        data: { usaTotvs: true },
+      });
+    }
 
     const resultados: Record<string, { importados: number; erros: number; ignorado?: boolean }> = {};
     let uploadId: string | null = null;

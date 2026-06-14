@@ -1,12 +1,30 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { DashboardLayout } from "@/components/DashboardLayout";
+import {
+  BIBarList,
+  BIBadge,
+  BIDataTable,
+  BIKpi,
+  BISection,
+  BITabs,
+} from "@/components/bi/BIKit";
+
+type Aba = "visao" | "pipeline" | "oficinas" | "grade";
 
 interface Etapa {
   id: string;
   nome: string;
   ordem: number;
+}
+
+interface ItemOP {
+  id: string;
+  cor: string | null;
+  tamanho: string | null;
+  quantidade: number;
+  custoTotal: number;
 }
 
 interface Movimentacao {
@@ -21,204 +39,237 @@ interface OP {
   numero: string;
   produto: string;
   referencia: string | null;
+  genero: string | null;
   oficina: string | null;
   qtdTotal: number;
   custoTotal: number;
-  status: string;
+  status: "AGUARDANDO" | "EM_ANDAMENTO" | "CONCLUIDA" | "CANCELADA";
   etapaAtualId: string | null;
   programacao: { etapas: Etapa[] };
+  itens: ItemOP[];
   movimentacoes: Movimentacao[];
   createdAt: string;
 }
 
-// ── Helpers ────────────────────────────────────────────────────────────────────
+const moeda = new Intl.NumberFormat("pt-BR", {
+  style: "currency",
+  currency: "BRL",
+});
+const inteiro = new Intl.NumberFormat("pt-BR");
 
 function diasEntre(inicio: string, fim?: string | null) {
-  const d1 = new Date(inicio).getTime();
-  const d2 = fim ? new Date(fim).getTime() : Date.now();
-  return Math.floor((d2 - d1) / 86_400_000);
+  const final = fim ? new Date(fim).getTime() : Date.now();
+  return Math.max(0, Math.floor((final - new Date(inicio).getTime()) / 86_400_000));
 }
 
-function formatarData(iso: string | null) {
-  if (!iso) return "—";
-  return new Date(iso).toLocaleDateString("pt-BR");
+function movimentacaoAtual(op: OP) {
+  return [...op.movimentacoes].reverse().find((movimento) => !movimento.dataSaida);
 }
 
-function diasNaEtapaAtual(op: OP): number | null {
-  const movAtual = [...op.movimentacoes].reverse().find((m) => !m.dataSaida);
-  if (!movAtual) return null;
-  return diasEntre(movAtual.dataEntrada);
+function diasNaEtapa(op: OP) {
+  const movimento = movimentacaoAtual(op);
+  return movimento ? diasEntre(movimento.dataEntrada) : 0;
 }
 
-function corAlerta(dias: number) {
-  if (dias > 10) return { bg: "bg-[#ef8e78]/15", text: "text-[#ef8e78]", label: "Crítico" };
-  if (dias > 5) return { bg: "bg-[#e6c071]/15", text: "text-[#e6c071]", label: "Atenção" };
-  return { bg: "bg-[#73d9cb]/15", text: "text-[#73d9cb]", label: "Normal" };
+function etapaAtual(op: OP) {
+  return op.programacao.etapas.find((etapa) => etapa.id === op.etapaAtualId)?.nome ?? "Sem etapa";
 }
 
-// ── Badges ─────────────────────────────────────────────────────────────────────
-
-function BadgeStatus({ status }: { status: string }) {
-  const map: Record<string, string> = {
-    EM_ANDAMENTO: "bg-[#00B8C6]/20 text-[#00B8C6]",
-    CONCLUIDA: "bg-[#C8F34D]/20 text-[#C8F34D]",
-    AGUARDANDO: "bg-white/10 text-white/60",
-    CANCELADA: "bg-red-500/20 text-red-400",
-  };
-  const label: Record<string, string> = {
-    EM_ANDAMENTO: "Em andamento",
-    CONCLUIDA: "Concluída",
-    AGUARDANDO: "Aguardando",
-    CANCELADA: "Cancelada",
-  };
-  return (
-    <span
-      className={`rounded px-2 py-0.5 text-[11px] font-semibold ${map[status] ?? "bg-white/10 text-white/50"}`}
-    >
-      {label[status] ?? status}
-    </span>
-  );
+function tomTempo(dias: number): "success" | "warning" | "danger" {
+  if (dias > 10) return "danger";
+  if (dias > 5) return "warning";
+  return "success";
 }
-
-// ── Page ───────────────────────────────────────────────────────────────────────
 
 export default function ProducaoPage() {
+  const [aba, setAba] = useState<Aba>("visao");
   const [ops, setOps] = useState<OP[]>([]);
   const [carregando, setCarregando] = useState(true);
-  const [filtroStatus, setFiltroStatus] = useState("EM_ANDAMENTO");
   const [arquivo, setArquivo] = useState<File | null>(null);
   const [importando, setImportando] = useState(false);
-  const [msgImport, setMsgImport] = useState("");
+  const [mensagem, setMensagem] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
 
-  const buscarOps = async (status: string) => {
+  async function buscarOps() {
     setCarregando(true);
     try {
-      const r = await fetch(`/api/producao/ops?status=${status}`);
-      const data = await r.json();
-      setOps(data.ops ?? []);
+      const resposta = await fetch("/api/producao/ops");
+      const dados = await resposta.json();
+      setOps(dados.ops ?? []);
     } finally {
       setCarregando(false);
     }
-  };
+  }
 
   useEffect(() => {
-    buscarOps(filtroStatus);
-  }, [filtroStatus]);
+    void Promise.resolve().then(buscarOps);
+  }, []);
 
-  const importar = async () => {
+  async function importar() {
     if (!arquivo) return;
     setImportando(true);
-    setMsgImport("");
-    const fd = new FormData();
-    fd.append("arquivo", arquivo);
+    setMensagem("");
+    const formData = new FormData();
+    formData.append("arquivo", arquivo);
     try {
-      const r = await fetch("/api/producao/imports", {
+      const resposta = await fetch("/api/producao/imports", {
         method: "POST",
-        body: fd,
+        body: formData,
       });
-      const data = await r.json();
-      if (data.sucesso) {
-        setMsgImport(
-          `Importadas: ${data.importadas} | Já existentes: ${data.atualizadas} | Erros: ${data.erros}`
-        );
+      const dados = await resposta.json();
+      setMensagem(
+        resposta.ok
+          ? `Importadas ${dados.importadas}; existentes ${dados.atualizadas}; erros ${dados.erros}.`
+          : dados.erro ?? "Erro na importação",
+      );
+      if (resposta.ok) {
         setArquivo(null);
         if (fileRef.current) fileRef.current.value = "";
-        buscarOps(filtroStatus);
-      } else {
-        setMsgImport(data.erro ?? "Erro na importação");
+        await buscarOps();
       }
     } catch {
-      setMsgImport("Erro ao conectar com o servidor");
+      setMensagem("Erro ao conectar com o servidor");
     } finally {
       setImportando(false);
     }
-  };
+  }
 
-  // Métricas derivadas
-  const opsAndamento = ops.filter((o) => o.status === "EM_ANDAMENTO");
-  const opsCriticas = opsAndamento.filter((o) => {
-    const d = diasNaEtapaAtual(o);
-    return d !== null && d > 10;
-  });
-  const opsAtencao = opsAndamento.filter((o) => {
-    const d = diasNaEtapaAtual(o);
-    return d !== null && d > 5 && d <= 10;
-  });
-  const opsNormais = opsAndamento.filter((o) => {
-    const d = diasNaEtapaAtual(o);
-    return d !== null && d <= 5;
-  });
+  const metricas = useMemo(() => {
+    const abertas = ops.filter((op) => !["CONCLUIDA", "CANCELADA"].includes(op.status));
+    const andamento = ops.filter((op) => op.status === "EM_ANDAMENTO");
+    const concluidas = ops.filter((op) => op.status === "CONCLUIDA");
+    const quantidadeAberta = abertas.reduce((soma, op) => soma + op.qtdTotal, 0);
+    const quantidadeAndamento = andamento.reduce((soma, op) => soma + op.qtdTotal, 0);
+    const quantidadeConcluida = concluidas.reduce((soma, op) => soma + op.qtdTotal, 0);
+    const criticas = andamento.filter((op) => diasNaEtapa(op) > 10);
+    const custoAberto = abertas.reduce((soma, op) => soma + op.custoTotal, 0);
+    return {
+      abertas,
+      andamento,
+      concluidas,
+      quantidadeAberta,
+      quantidadeAndamento,
+      quantidadeConcluida,
+      criticas,
+      custoAberto,
+      conclusaoPct:
+        quantidadeAberta + quantidadeConcluida > 0
+          ? (quantidadeConcluida / (quantidadeAberta + quantidadeConcluida)) * 100
+          : 0,
+    };
+  }, [ops]);
 
-  // Por oficina
-  const porOficina = new Map<string, { qtd: number; pecas: number; criticas: number }>();
-  opsAndamento.forEach((op) => {
-    const key = op.oficina ?? "Sem oficina";
-    const cur = porOficina.get(key) ?? { qtd: 0, pecas: 0, criticas: 0 };
-    const dias = diasNaEtapaAtual(op);
-    porOficina.set(key, {
-      qtd: cur.qtd + 1,
-      pecas: cur.pecas + op.qtdTotal,
-      criticas: cur.criticas + (dias !== null && dias > 10 ? 1 : 0),
-    });
-  });
+  const porEtapa = useMemo(() => {
+    const mapa = new Map<string, { ops: number; quantidade: number; dias: number[] }>();
+    for (const op of metricas.andamento) {
+      const nome = etapaAtual(op);
+      const atual = mapa.get(nome) ?? { ops: 0, quantidade: 0, dias: [] };
+      atual.ops++;
+      atual.quantidade += op.qtdTotal;
+      atual.dias.push(diasNaEtapa(op));
+      mapa.set(nome, atual);
+    }
+    return Array.from(mapa.entries()).map(([nome, item]) => ({
+      nome,
+      ops: item.ops,
+      quantidade: item.quantidade,
+      mediaDias:
+        item.dias.length > 0
+          ? Math.round(item.dias.reduce((soma, dias) => soma + dias, 0) / item.dias.length)
+          : 0,
+    }));
+  }, [metricas.andamento]);
 
-  // Tempo médio por etapa (das OPs em andamento — etapa atual)
-  const etapas = ops[0]?.programacao?.etapas ?? [];
-  const porEtapa = new Map<string, { ops: number[]; opsIds: string[] }>();
-  etapas.forEach((e) => porEtapa.set(e.id, { ops: [], opsIds: [] }));
-  opsAndamento.forEach((op) => {
-    if (op.etapaAtualId) {
-      const movAtual = [...op.movimentacoes].reverse().find((m) => !m.dataSaida);
-      if (movAtual) {
-        const entry = porEtapa.get(op.etapaAtualId);
-        if (entry) {
-          entry.ops.push(diasEntre(movAtual.dataEntrada));
-          entry.opsIds.push(op.id);
-        }
+  const porOficina = useMemo(() => {
+    const mapa = new Map<string, { ops: number; quantidade: number; custo: number; criticas: number }>();
+    for (const op of metricas.andamento) {
+      const nome = op.oficina ?? "Sem oficina";
+      const atual = mapa.get(nome) ?? { ops: 0, quantidade: 0, custo: 0, criticas: 0 };
+      atual.ops++;
+      atual.quantidade += op.qtdTotal;
+      atual.custo += op.custoTotal;
+      atual.criticas += diasNaEtapa(op) > 10 ? 1 : 0;
+      mapa.set(nome, atual);
+    }
+    return Array.from(mapa.entries())
+      .map(([nome, item]) => ({ nome, ...item }))
+      .sort((a, b) => b.quantidade - a.quantidade);
+  }, [metricas.andamento]);
+
+  const tamanhos = useMemo(
+    () =>
+      Array.from(
+        new Set(ops.flatMap((op) => op.itens.map((item) => item.tamanho).filter(Boolean))),
+      ).sort() as string[],
+    [ops],
+  );
+
+  const gradePorReferencia = useMemo(() => {
+    const mapa = new Map<
+      string,
+      { produto: string; total: number; custo: number; tamanhos: Map<string, number> }
+    >();
+    for (const op of ops) {
+      const referencia = op.referencia ?? op.produto;
+      const atual = mapa.get(referencia) ?? {
+        produto: op.produto,
+        total: 0,
+        custo: 0,
+        tamanhos: new Map<string, number>(),
+      };
+      atual.total += op.qtdTotal;
+      atual.custo += op.custoTotal;
+      for (const item of op.itens) {
+        const tamanho = item.tamanho ?? "Sem tam.";
+        atual.tamanhos.set(tamanho, (atual.tamanhos.get(tamanho) ?? 0) + item.quantidade);
       }
+      mapa.set(referencia, atual);
     }
-  });
-
-  // Kanban
-  const kanbanPorEtapa = new Map<string, OP[]>();
-  etapas.forEach((e) => kanbanPorEtapa.set(e.id, []));
-  opsAndamento.forEach((op) => {
-    if (op.etapaAtualId && kanbanPorEtapa.has(op.etapaAtualId)) {
-      kanbanPorEtapa.get(op.etapaAtualId)!.push(op);
-    }
-  });
+    return Array.from(mapa.entries())
+      .map(([referencia, item]) => ({ referencia, ...item }))
+      .sort((a, b) => b.total - a.total);
+  }, [ops]);
 
   return (
-    <DashboardLayout titulo="Produção" descricao="Acompanhamento estratégico de Ordens de Produção">
-      <div className="min-h-screen bg-[var(--bg-dark)] p-6 text-[#f2fbf8]">
-        {/* Header */}
-        <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold text-[#73d9cb]">Produção</h1>
-            <p className="mt-1 text-sm text-[#b3ceca]">
-              Acompanhamento estratégico de Ordens de Produção
-            </p>
+    <DashboardLayout
+      titulo="Produção e Ordens"
+      descricao="Abertura, fluxo, gargalos, oficinas e grade de produção"
+    >
+      <div className="space-y-3">
+        <div className="flex flex-col gap-2 xl:flex-row xl:items-center xl:justify-between">
+          <div className="overflow-x-auto">
+            <BITabs
+              value={aba}
+              onChange={setAba}
+              items={[
+                { id: "visao", label: "Visão executiva" },
+                { id: "pipeline", label: "Pipeline e etapas" },
+                { id: "oficinas", label: "Oficinas" },
+                { id: "grade", label: "Referências e grade" },
+              ]}
+            />
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <input
               ref={fileRef}
               type="file"
               accept=".xlsx"
               className="hidden"
-              onChange={(e) => setArquivo(e.target.files?.[0] ?? null)}
+              onChange={(evento) => setArquivo(evento.target.files?.[0] ?? null)}
             />
             <button
+              type="button"
               onClick={() => fileRef.current?.click()}
-              className="rounded border border-[var(--border-col)] bg-[var(--card-dark)] px-3 py-1.5 text-sm text-[#b3ceca] hover:text-white"
+              className="rounded-lg border border-[var(--border-col)] bg-[var(--bg-panel)] px-3 py-2 text-[11px] font-bold text-[var(--text-secondary)]"
             >
-              {arquivo ? arquivo.name : "Selecionar Excel"}
+              {arquivo?.name ?? "Selecionar Excel"}
             </button>
             {arquivo && (
               <button
-                onClick={importar}
+                type="button"
+                onClick={() => void importar()}
                 disabled={importando}
-                className="rounded bg-[#00B8C6] px-3 py-1.5 text-sm font-semibold text-[#0A1F1F] disabled:opacity-50"
+                className="rounded-lg bg-[#73d9cb] px-3 py-2 text-[11px] font-extrabold text-[#06211f] disabled:opacity-50"
               >
                 {importando ? "Importando..." : "Importar OPs"}
               </button>
@@ -226,366 +277,268 @@ export default function ProducaoPage() {
           </div>
         </div>
 
-        {msgImport && (
-          <div className="mb-4 rounded border border-[var(--border-col)] bg-[var(--card-dark)] p-3 text-sm text-[#73d9cb]">
-            {msgImport}
+        {mensagem && (
+          <div className="rounded-xl border border-[#73d9cb]/30 bg-[#73d9cb]/8 p-3 text-xs text-[var(--accent)]">
+            {mensagem}
           </div>
         )}
 
-        {/* ── Alertas estratégicos ───────────────────────────────────────── */}
-        <div className="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <div className="rounded-xl border border-[#ef8e78]/30 bg-[#ef8e78]/10 p-4">
-            <p className="text-[10px] font-extrabold uppercase tracking-wider text-[#ef8e78]">
-              Alerta crítico
-            </p>
-            <p className="mt-1 text-3xl font-extrabold text-[#ef8e78]">
-              {opsCriticas.length}
-            </p>
-            <p className="mt-1 text-[11px] text-[#ef8e78]/70">
-              OPs paradas há mais de 10 dias
-            </p>
+        {carregando ? (
+          <div className="grid grid-cols-2 gap-2 xl:grid-cols-6">
+            {Array.from({ length: 6 }).map((_, index) => (
+              <div
+                key={index}
+                className="h-24 animate-pulse rounded-xl border border-[var(--border-col)] bg-[var(--bg-panel)]"
+              />
+            ))}
           </div>
-          <div className="rounded-xl border border-[#e6c071]/30 bg-[#e6c071]/10 p-4">
-            <p className="text-[10px] font-extrabold uppercase tracking-wider text-[#e6c071]">
-              Atenção
-            </p>
-            <p className="mt-1 text-3xl font-extrabold text-[#e6c071]">
-              {opsAtencao.length}
-            </p>
-            <p className="mt-1 text-[11px] text-[#e6c071]/70">
-              OPs entre 6 e 10 dias na etapa
-            </p>
-          </div>
-          <div className="rounded-xl border border-[#73d9cb]/25 bg-[#73d9cb]/8 p-4">
-            <p className="text-[10px] font-extrabold uppercase tracking-wider text-[#73d9cb]">
-              Fluxo normal
-            </p>
-            <p className="mt-1 text-3xl font-extrabold text-[#73d9cb]">
-              {opsNormais.length}
-            </p>
-            <p className="mt-1 text-[11px] text-[#73d9cb]/70">
-              OPs em andamento há até 5 dias
-            </p>
-          </div>
-          <div className="rounded-xl border border-[#C8F34D]/25 bg-[#C8F34D]/8 p-4">
-            <p className="text-[10px] font-extrabold uppercase tracking-wider text-[#C8F34D]">
-              Concluídas
-            </p>
-            <p className="mt-1 text-3xl font-extrabold text-[#C8F34D]">
-              {ops.filter((o) => o.status === "CONCLUIDA").length}
-            </p>
-            <p className="mt-1 text-[11px] text-[#C8F34D]/70">
-              OPs finalizadas neste filtro
-            </p>
-          </div>
-        </div>
+        ) : (
+          <>
+            <section className="grid grid-cols-2 gap-2 md:grid-cols-3 xl:grid-cols-6">
+              <BIKpi
+                label="Ordens abertas"
+                value={inteiro.format(metricas.abertas.length)}
+                detail={`${inteiro.format(metricas.quantidadeAberta)} peças`}
+                tone="accent"
+              />
+              <BIKpi
+                label="Em produção"
+                value={inteiro.format(metricas.andamento.length)}
+                detail={`${inteiro.format(metricas.quantidadeAndamento)} peças`}
+              />
+              <BIKpi
+                label="Concluídas"
+                value={inteiro.format(metricas.concluidas.length)}
+                detail={`${inteiro.format(metricas.quantidadeConcluida)} peças`}
+                tone="success"
+              />
+              <BIKpi
+                label="% concluído"
+                value={`${metricas.conclusaoPct.toFixed(1)}%`}
+                detail="sobre peças abertas + concluídas"
+              />
+              <BIKpi
+                label="OPs críticas"
+                value={inteiro.format(metricas.criticas.length)}
+                detail="mais de 10 dias na etapa"
+                tone={metricas.criticas.length > 0 ? "danger" : "success"}
+              />
+              <BIKpi
+                label="Custo em aberto"
+                value={moeda.format(metricas.custoAberto)}
+                detail="custo informado nas OPs"
+              />
+            </section>
 
-        {/* ── Por oficina + Tempo por etapa ─────────────────────────────── */}
-        {opsAndamento.length > 0 && (
-          <div className="mb-5 grid gap-3 lg:grid-cols-2">
-            {/* Por oficina */}
-            <div className="rounded-xl border border-[var(--border-col)] bg-[var(--card-dark)] p-4">
-              <p className="mb-3 text-[10px] font-extrabold uppercase tracking-wider text-[#789b96]">
-                Distribuição por Oficina
-              </p>
+            {aba === "visao" && (
               <div className="space-y-3">
-                {Array.from(porOficina.entries()).map(
-                  ([oficina, { qtd, pecas, criticas }]) => (
-                    <div key={oficina} className="flex items-center gap-3">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between mb-1">
-                          <span className="text-[11px] font-semibold text-white truncate">
-                            {oficina}
-                          </span>
-                          <div className="flex items-center gap-2 flex-shrink-0">
-                            {criticas > 0 && (
-                              <span className="rounded bg-[#ef8e78]/20 px-1.5 py-0.5 text-[9px] font-bold text-[#ef8e78]">
-                                {criticas} crítica{criticas > 1 ? "s" : ""}
-                              </span>
-                            )}
-                            <span className="text-[11px] text-[#b3ceca]">
-                              {qtd} OPs · {pecas.toLocaleString("pt-BR")} peças
-                            </span>
-                          </div>
-                        </div>
-                        <div className="relative h-1.5 overflow-hidden rounded-full bg-[#1F3A3A]">
-                          <div
-                            className="h-full rounded-full"
-                            style={{
-                              width: `${(qtd / opsAndamento.length) * 100}%`,
-                              backgroundColor:
-                                criticas > 0 ? "#ef8e78" : "#73d9cb",
-                            }}
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  )
-                )}
-                {porOficina.size === 0 && (
-                  <p className="text-center text-[11px] text-[#789b96] py-2">
-                    Nenhuma OP em andamento
-                  </p>
-                )}
+                <section className="grid gap-3 xl:grid-cols-[1fr_1fr_1.5fr]">
+                  <BISection title="Peças por etapa" subtitle="Volume atual no pipeline">
+                    <BIBarList
+                      items={porEtapa.map((item) => ({
+                        label: item.nome,
+                        value: item.quantidade,
+                        detail: `${item.ops} OPs`,
+                      }))}
+                      formatValue={inteiro.format}
+                      color="#1478ff"
+                    />
+                  </BISection>
+                  <BISection title="Carga por oficina" subtitle="Peças em produção">
+                    <BIBarList
+                      items={porOficina.map((item) => ({
+                        label: item.nome,
+                        value: item.quantidade,
+                        detail: `${item.criticas} críticas`,
+                      }))}
+                      formatValue={inteiro.format}
+                      color="#00a9a5"
+                    />
+                  </BISection>
+                  <BISection title="Gargalos atuais" subtitle="Etapas com maior permanência média">
+                    <BIDataTable
+                      columns={[
+                        { key: "etapa", label: "Etapa" },
+                        { key: "ops", label: "OPs", align: "right" },
+                        { key: "quantidade", label: "Peças", align: "right" },
+                        { key: "tempo", label: "Tempo médio", align: "right" },
+                        { key: "situacao", label: "Situação", align: "right" },
+                      ]}
+                      rows={[...porEtapa]
+                        .sort((a, b) => b.mediaDias - a.mediaDias)
+                        .map((item) => ({
+                          id: item.nome,
+                          etapa: <span className="font-bold">{item.nome}</span>,
+                          ops: inteiro.format(item.ops),
+                          quantidade: inteiro.format(item.quantidade),
+                          tempo: `${item.mediaDias} dias`,
+                          situacao: (
+                            <BIBadge tone={tomTempo(item.mediaDias)}>
+                              {item.mediaDias > 10
+                                ? "Crítico"
+                                : item.mediaDias > 5
+                                  ? "Atenção"
+                                  : "Normal"}
+                            </BIBadge>
+                          ),
+                        }))}
+                    />
+                  </BISection>
+                </section>
+                <BISection title="Ordens de produção" subtitle="Visão sintética do portfólio atual">
+                  <BIDataTable
+                    columns={[
+                      { key: "op", label: "OP" },
+                      { key: "referencia", label: "Referência" },
+                      { key: "produto", label: "Produto" },
+                      { key: "oficina", label: "Oficina" },
+                      { key: "pecas", label: "Peças", align: "right" },
+                      { key: "custo", label: "Custo", align: "right" },
+                      { key: "etapa", label: "Etapa atual" },
+                      { key: "tempo", label: "Tempo", align: "right" },
+                      { key: "status", label: "Status", align: "right" },
+                    ]}
+                    rows={ops.map((op) => ({
+                      id: op.id,
+                      op: <span className="font-black">{op.numero}</span>,
+                      referencia: op.referencia ?? "—",
+                      produto: op.produto,
+                      oficina: op.oficina ?? "—",
+                      pecas: inteiro.format(op.qtdTotal),
+                      custo: moeda.format(op.custoTotal),
+                      etapa: etapaAtual(op),
+                      tempo: `${diasNaEtapa(op)}d`,
+                      status: (
+                        <BIBadge
+                          tone={
+                            op.status === "CONCLUIDA"
+                              ? "success"
+                              : op.status === "CANCELADA"
+                                ? "danger"
+                                : op.status === "AGUARDANDO"
+                                  ? "warning"
+                                  : "accent"
+                          }
+                        >
+                          {op.status.replace("_", " ")}
+                        </BIBadge>
+                      ),
+                    }))}
+                  />
+                </BISection>
               </div>
-            </div>
+            )}
 
-            {/* Tempo médio por etapa */}
-            <div className="rounded-xl border border-[var(--border-col)] bg-[var(--card-dark)] p-4">
-              <p className="mb-3 text-[10px] font-extrabold uppercase tracking-wider text-[#789b96]">
-                Tempo médio por etapa (OPs ativas)
-              </p>
-              <div className="space-y-2.5">
-                {etapas.map((etapa) => {
-                  const entry = porEtapa.get(etapa.id);
-                  const qtdEtapa = entry?.ops.length ?? 0;
-                  const mediaDias =
-                    qtdEtapa > 0
-                      ? Math.round(
-                          entry!.ops.reduce((s, d) => s + d, 0) / qtdEtapa
-                        )
-                      : 0;
-                  const { text, label } = corAlerta(mediaDias);
-                  return (
-                    <div
-                      key={etapa.id}
-                      className="flex items-center justify-between text-[11px]"
+            {aba === "pipeline" && (
+              <div className="space-y-3">
+                <section className="grid gap-3 xl:grid-cols-3">
+                  {porEtapa.map((item) => (
+                    <BISection
+                      key={item.nome}
+                      title={item.nome}
+                      subtitle={`${item.ops} OPs · ${inteiro.format(item.quantidade)} peças`}
                     >
-                      <span className="font-semibold text-[#b3ceca]">
-                        {etapa.nome}
-                      </span>
-                      <div className="flex items-center gap-3">
-                        <span className="text-[#789b96]">
-                          {qtdEtapa > 0
-                            ? `${qtdEtapa} OP${qtdEtapa > 1 ? "s" : ""}`
-                            : "—"}
+                      <div className="mb-3 flex items-center justify-between">
+                        <span className="text-xs text-[var(--text-secondary)]">
+                          Permanência média
                         </span>
-                        {qtdEtapa > 0 && (
-                          <span
-                            className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${text}`}
-                          >
-                            {mediaDias}d méd · {label}
-                          </span>
-                        )}
+                        <BIBadge tone={tomTempo(item.mediaDias)}>
+                          {item.mediaDias} dias
+                        </BIBadge>
                       </div>
-                    </div>
-                  );
-                })}
-                {etapas.length === 0 && (
-                  <p className="text-center text-[11px] text-[#789b96] py-2">
-                    Sem programação cadastrada
-                  </p>
-                )}
+                      <div className="space-y-2">
+                        {metricas.andamento
+                          .filter((op) => etapaAtual(op) === item.nome)
+                          .slice(0, 8)
+                          .map((op) => (
+                            <div
+                              key={op.id}
+                              className="rounded-lg border border-[var(--border-col)] bg-[var(--bg-panel-soft)] p-2.5"
+                            >
+                              <div className="flex items-center justify-between gap-2">
+                                <strong className="text-[11px]">OP {op.numero}</strong>
+                                <BIBadge tone={tomTempo(diasNaEtapa(op))}>
+                                  {diasNaEtapa(op)}d
+                                </BIBadge>
+                              </div>
+                              <p className="mt-1 truncate text-[10px] text-[var(--text-secondary)]">
+                                {op.referencia ?? op.produto} · {inteiro.format(op.qtdTotal)} peças
+                              </p>
+                            </div>
+                          ))}
+                      </div>
+                    </BISection>
+                  ))}
+                </section>
               </div>
-            </div>
-          </div>
-        )}
+            )}
 
-        {/* ── Filtros de status ─────────────────────────────────────────── */}
-        <div className="mb-4 flex gap-2">
-          {["EM_ANDAMENTO", "CONCLUIDA", "AGUARDANDO", "CANCELADA"].map(
-            (s) => (
-              <button
-                key={s}
-                onClick={() => setFiltroStatus(s)}
-                className={`rounded px-3 py-1 text-xs font-semibold transition-colors ${
-                  filtroStatus === s
-                    ? "bg-[#00B8C6] text-[#0A1F1F]"
-                    : "border border-[var(--border-col)] text-[#b3ceca] hover:text-white"
-                }`}
+            {aba === "oficinas" && (
+              <BISection title="Análise por oficina" subtitle="Carga, custo e risco operacional">
+                <BIDataTable
+                  columns={[
+                    { key: "oficina", label: "Oficina" },
+                    { key: "ops", label: "OPs", align: "right" },
+                    { key: "pecas", label: "Peças", align: "right" },
+                    { key: "custo", label: "Custo", align: "right" },
+                    { key: "criticas", label: "Críticas", align: "right" },
+                    { key: "participacao", label: "% carga", align: "right" },
+                  ]}
+                  rows={porOficina.map((item) => ({
+                    id: item.nome,
+                    oficina: <span className="font-bold">{item.nome}</span>,
+                    ops: inteiro.format(item.ops),
+                    pecas: inteiro.format(item.quantidade),
+                    custo: moeda.format(item.custo),
+                    criticas: (
+                      <BIBadge tone={item.criticas > 0 ? "danger" : "success"}>
+                        {item.criticas}
+                      </BIBadge>
+                    ),
+                    participacao: `${(
+                      (item.quantidade / Math.max(metricas.quantidadeAndamento, 1)) *
+                      100
+                    ).toFixed(1)}%`,
+                  }))}
+                />
+              </BISection>
+            )}
+
+            {aba === "grade" && (
+              <BISection
+                title="Produção por referência e grade"
+                subtitle="Distribuição de peças por tamanho disponível nas OPs"
               >
-                {
-                  {
-                    EM_ANDAMENTO: "Em Andamento",
-                    CONCLUIDA: "Concluída",
-                    AGUARDANDO: "Aguardando",
-                    CANCELADA: "Cancelada",
-                  }[s]
-                }
-              </button>
-            )
-          )}
-        </div>
-
-        {/* ── Pipeline Kanban ───────────────────────────────────────────── */}
-        {filtroStatus === "EM_ANDAMENTO" && etapas.length > 0 && (
-          <div className="mb-6 overflow-x-auto">
-            <div
-              className="flex gap-3 pb-2"
-              style={{ minWidth: `${etapas.length * 200}px` }}
-            >
-              {etapas.map((etapa) => {
-                const opsEtapa = kanbanPorEtapa.get(etapa.id) ?? [];
-                const temCritica = opsEtapa.some((op) => {
-                  const d = diasNaEtapaAtual(op);
-                  return d !== null && d > 10;
-                });
-                return (
-                  <div key={etapa.id} className="w-48 flex-shrink-0">
-                    <div className="mb-2 flex items-center justify-between">
-                      <span
-                        className={`text-xs font-bold ${temCritica ? "text-[#ef8e78]" : "text-[#73d9cb]"}`}
-                      >
-                        {etapa.nome}
-                      </span>
-                      <span
-                        className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
-                          temCritica
-                            ? "bg-[#ef8e78]/20 text-[#ef8e78]"
-                            : "bg-[#00B8C6]/20 text-[#00B8C6]"
-                        }`}
-                      >
-                        {opsEtapa.length}
-                      </span>
-                    </div>
-                    <div className="space-y-2">
-                      {opsEtapa.map((op) => {
-                        const dias = diasNaEtapaAtual(op);
-                        const alerta = dias !== null ? corAlerta(dias) : null;
-                        return (
-                          <div
-                            key={op.id}
-                            className={`rounded-lg border p-3 ${
-                              alerta?.label === "Crítico"
-                                ? "border-[#ef8e78]/30 bg-[#ef8e78]/5"
-                                : alerta?.label === "Atenção"
-                                  ? "border-[#e6c071]/25 bg-[#e6c071]/5"
-                                  : "border-[var(--border-col)] bg-[var(--card-dark)]"
-                            }`}
-                          >
-                            <p className="text-xs font-bold text-white">
-                              OP {op.numero}
-                            </p>
-                            <p className="mt-0.5 text-[11px] leading-tight text-[#b3ceca]">
-                              {op.produto}
-                            </p>
-                            {op.oficina && (
-                              <p className="mt-0.5 text-[10px] text-[#789b96]">
-                                {op.oficina}
-                              </p>
-                            )}
-                            <p className="mt-1 text-[10px] text-[#789b96]">
-                              {op.qtdTotal} peças
-                            </p>
-                            {dias !== null && alerta && (
-                              <p
-                                className={`mt-1 text-[10px] font-bold ${alerta.text}`}
-                              >
-                                {dias}d na etapa · {alerta.label}
-                              </p>
-                            )}
-                          </div>
-                        );
-                      })}
-                      {opsEtapa.length === 0 && (
-                        <p className="py-4 text-center text-[11px] text-[#789b96]/50">
-                          —
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
+                <BIDataTable
+                  columns={[
+                    { key: "referencia", label: "Referência" },
+                    { key: "produto", label: "Produto" },
+                    { key: "total", label: "Total", align: "right" },
+                    ...tamanhos.map((tamanho) => ({
+                      key: `tam-${tamanho}`,
+                      label: tamanho,
+                      align: "right" as const,
+                    })),
+                    { key: "custo", label: "Custo", align: "right" },
+                  ]}
+                  rows={gradePorReferencia.map((item) => ({
+                    id: item.referencia,
+                    referencia: <span className="font-black">{item.referencia}</span>,
+                    produto: item.produto,
+                    total: inteiro.format(item.total),
+                    custo: moeda.format(item.custo),
+                    ...Object.fromEntries(
+                      tamanhos.map((tamanho) => [
+                        `tam-${tamanho}`,
+                        inteiro.format(item.tamanhos.get(tamanho) ?? 0),
+                      ]),
+                    ),
+                  }))}
+                />
+              </BISection>
+            )}
+          </>
         )}
-
-        {/* ── Tabela ───────────────────────────────────────────────────── */}
-        <div className="overflow-x-auto rounded-lg border border-[var(--border-col)] bg-[var(--card-dark)]">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-[var(--border-col)] text-[10px] font-extrabold uppercase tracking-wider text-[#789b96]">
-                <th className="px-4 py-3 text-left">OP</th>
-                <th className="px-4 py-3 text-left">Produto</th>
-                <th className="px-4 py-3 text-left">Oficina</th>
-                <th className="px-4 py-3 text-right">Peças</th>
-                <th className="px-4 py-3 text-right">Custo</th>
-                <th className="px-4 py-3 text-left">Etapa atual</th>
-                <th className="px-4 py-3 text-left">Tempo na etapa</th>
-                <th className="px-4 py-3 text-left">Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {carregando ? (
-                <tr>
-                  <td
-                    colSpan={8}
-                    className="py-8 text-center text-[#789b96]"
-                  >
-                    Carregando...
-                  </td>
-                </tr>
-              ) : ops.length === 0 ? (
-                <tr>
-                  <td
-                    colSpan={8}
-                    className="py-8 text-center text-[#789b96]"
-                  >
-                    Nenhuma OP encontrada
-                  </td>
-                </tr>
-              ) : (
-                ops.map((op) => {
-                  const mov = [...op.movimentacoes]
-                    .reverse()
-                    .find((m) => !m.dataSaida);
-                  const etapaNome = op.etapaAtualId
-                    ? (op.programacao.etapas.find(
-                        (e) => e.id === op.etapaAtualId
-                      )?.nome ?? "—")
-                    : "—";
-                  const dias = diasNaEtapaAtual(op);
-                  const alerta = dias !== null ? corAlerta(dias) : null;
-                  return (
-                    <tr
-                      key={op.id}
-                      className="border-b border-[var(--border-col)]/40 hover:bg-white/3"
-                    >
-                      <td className="px-4 py-3 font-bold text-white">
-                        {op.numero}
-                      </td>
-                      <td className="max-w-[180px] truncate px-4 py-3 text-[#b3ceca]">
-                        {op.produto}
-                      </td>
-                      <td className="px-4 py-3 text-[11px] text-[#b3ceca]">
-                        {op.oficina ?? "—"}
-                      </td>
-                      <td className="px-4 py-3 text-right text-white">
-                        {op.qtdTotal.toLocaleString("pt-BR")}
-                      </td>
-                      <td className="px-4 py-3 text-right text-white">
-                        {op.custoTotal > 0
-                          ? `R$ ${op.custoTotal.toLocaleString("pt-BR", { minimumFractionDigits: 0 })}`
-                          : "—"}
-                      </td>
-                      <td className="px-4 py-3 text-[11px] text-[#73d9cb]">
-                        {etapaNome}
-                      </td>
-                      <td className="px-4 py-3">
-                        {dias !== null && alerta ? (
-                          <span
-                            className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${alerta.bg} ${alerta.text}`}
-                          >
-                            {dias}d · {alerta.label}
-                          </span>
-                        ) : mov ? (
-                          <span className="text-[11px] text-[#789b96]">
-                            desde {formatarData(mov.dataEntrada)}
-                          </span>
-                        ) : (
-                          <span className="text-[11px] text-[#789b96]">—</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3">
-                        <BadgeStatus status={op.status} />
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
       </div>
     </DashboardLayout>
   );

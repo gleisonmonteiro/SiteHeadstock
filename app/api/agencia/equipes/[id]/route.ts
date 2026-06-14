@@ -8,10 +8,11 @@ export async function GET(
 ) {
   try {
     const usuario = await exigirUsuarioSessao(request);
+    if (usuario.empresa.tipo !== "AGENCIA") {
+      return NextResponse.json({ erro: "Acesso restrito a agências" }, { status: 403 });
+    }
     const { id } = await params;
-    const agenciaId =
-      request.nextUrl.searchParams.get("agenciaId") ?? usuario.empresaId;
-    const dados = await obterEquipeDetalhe(agenciaId, id);
+    const dados = await obterEquipeDetalhe(usuario.empresaId, id);
     if (!dados) return NextResponse.json({ erro: "Equipe não encontrada" }, { status: 404 });
     return NextResponse.json(dados);
   } catch (erro) {

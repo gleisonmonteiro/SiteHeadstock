@@ -45,6 +45,7 @@ export async function POST(request: NextRequest) {
         empresa: {
           nome: usuario.empresa.nome,
           tipo: usuario.empresa.tipo,
+          usaTotvs: usuario.empresa.usaTotvs,
         },
       },
     });

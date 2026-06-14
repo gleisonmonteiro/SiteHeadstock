@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { exigirUsuarioSessao, respostaErroApi } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
+import { exigirAcessoDecisao } from "@/lib/access";
 import {
   obterKPIsDashboard,
   obterTop10Produtos,
@@ -12,6 +13,7 @@ import {
 
 async function resolverEmpresaId(request: NextRequest): Promise<string | null> {
   const usuario = await exigirUsuarioSessao(request);
+  exigirAcessoDecisao(usuario.papel);
   const param = request.nextUrl.searchParams.get("empresaId");
 
   if (!param) return usuario.empresaId;

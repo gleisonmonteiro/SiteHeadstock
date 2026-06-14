@@ -27,6 +27,7 @@ export async function listarOPs(empresaId: string, status?: string) {
     },
     include: {
       programacao: { include: { etapas: { orderBy: { ordem: "asc" } } } },
+      itens: { orderBy: [{ cor: "asc" }, { tamanho: "asc" }] },
       movimentacoes: {
         include: { etapa: true },
         orderBy: { dataEntrada: "asc" },
@@ -104,7 +105,7 @@ export async function movimentarOP(
   });
 }
 
-export async function concluirOP(empresaId: string, opId: string, usuarioId: string) {
+export async function concluirOP(empresaId: string, opId: string) {
   const op = await prisma.ordemProducao.findFirst({
     where: { id: opId, empresaId },
     include: { movimentacoes: { orderBy: { dataEntrada: "desc" }, take: 1 } },

@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { DashboardLayout } from "@/components/DashboardLayout";
 
 // ── Tipos ──────────────────────────────────────────────────────────────────────
@@ -154,6 +154,8 @@ const CORES: Record<ModuloId, string> = {
 // ── Componente principal ───────────────────────────────────────────────────────
 
 export default function UploadsPage() {
+  const [usaTotvs, setUsaTotvs] = useState(false);
+  const [preferenciaCarregada, setPreferenciaCarregada] = useState(false);
   const [arquivos, setArquivos] = useState<Record<ModuloId, File | null>>({
     produtos: null, estoque: null, pagar: null, receber: null, vendas: null,
   });
@@ -171,6 +173,19 @@ export default function UploadsPage() {
     produtos: null, estoque: null, pagar: null, receber: null, vendas: null,
   });
 
+  useEffect(() => {
+    const carregarPreferencia = async () => {
+      try {
+        const resposta = await fetch("/api/auth/me");
+        const dados = await resposta.json();
+        setUsaTotvs(Boolean(dados.usuario?.empresa?.usaTotvs));
+      } finally {
+        setPreferenciaCarregada(true);
+      }
+    };
+    void carregarPreferencia();
+  }, []);
+
   const handleFileChange = (id: ModuloId, file: File | null) => {
     setArquivos((prev) => ({ ...prev, [id]: file }));
     setErros((prev) => ({ ...prev, [id]: "" }));
@@ -187,6 +202,7 @@ export default function UploadsPage() {
     try {
       const formData = new FormData();
       formData.append("arquivo", arquivo);
+      formData.append("usaTotvs", String(usaTotvs));
 
       const res = await fetch("/api/uploads/modulos", { method: "POST", body: formData });
       const data = await res.json();
@@ -241,7 +257,30 @@ export default function UploadsPage() {
       titulo="Importar Dados"
       descricao="Importe planilhas Excel para atualizar cada módulo. A aba da planilha deve ter o nome indicado."
     >
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 xl:grid-cols-3">
+      <div className="space-y-4">
+        <section className="flex flex-col gap-3 rounded-xl border border-[var(--border-col)] bg-[var(--bg-panel)] p-4 shadow-[var(--shadow-panel)] md:flex-row md:items-center md:justify-between">
+          <div>
+            <h2 className="text-sm font-extrabold text-[var(--text-primary)]">
+              Origem da planilha
+            </h2>
+            <p className="mt-1 text-xs text-[var(--text-secondary)]">
+              Marque TOTVS somente para arquivos preparados a partir desse ERP.
+              Após a primeira importação, a escolha ficará salva para a empresa.
+            </p>
+          </div>
+          <label className="flex min-w-44 items-center gap-3 rounded-lg border border-[var(--border-col)] bg-[var(--bg-panel-soft)] px-4 py-3 text-sm font-bold">
+            <input
+              type="checkbox"
+              checked={usaTotvs}
+              disabled={!preferenciaCarregada}
+              onChange={(evento) => setUsaTotvs(evento.target.checked)}
+              className="h-4 w-4 accent-[#73d9cb]"
+            />
+            Planilha TOTVS
+          </label>
+        </section>
+
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 xl:grid-cols-3">
         {MODULOS.map((modulo) => {
           const cor = CORES[modulo.id];
           const arquivo = arquivos[modulo.id];
@@ -403,7 +442,10 @@ export default function UploadsPage() {
             <ol className="space-y-2 text-sm text-gray-500 dark:text-gray-400">
               <li className="flex gap-2">
                 <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-gray-200 text-[10px] font-bold text-gray-600 dark:bg-gray-700 dark:text-gray-300">1</span>
-                Exporte o relatório do TOTVS Virtual Report e salve como <code className="rounded bg-gray-200 px-1 dark:bg-gray-700">.xlsx</code>.
+                {usaTotvs
+                  ? "Exporte o relatório preparado no TOTVS e salve como "
+                  : "Use a planilha do cliente ou baixe o modelo do módulo em "}
+                <code className="rounded bg-gray-200 px-1 dark:bg-gray-700">.xlsx</code>.
               </li>
               <li className="flex gap-2">
                 <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-gray-200 text-[10px] font-bold text-gray-600 dark:bg-gray-700 dark:text-gray-300">2</span>
@@ -419,6 +461,7 @@ export default function UploadsPage() {
               </li>
             </ol>
           </div>
+        </div>
         </div>
       </div>
     </DashboardLayout>

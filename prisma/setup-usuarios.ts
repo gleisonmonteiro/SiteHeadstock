@@ -68,7 +68,7 @@ async function main() {
   const senhaHash = await bcrypt.hash("123456", 10);
 
   // 1. Gleison — MASTER_PLATFORM na Headstock (vê tudo)
-  const { empresa: headstock } = await garantirEmpresaUsuario({
+  await garantirEmpresaUsuario({
     email: "gleison@headstock.com",
     nome: "Gleison Monteiro",
     papel: "MASTER_PLATFORM",
@@ -79,7 +79,7 @@ async function main() {
   });
 
   // 2. Celso — AGENCY_CEO na crcom (vê FCM, não vê Cholet)
-  const { empresa: crcom, usuario: celso } = await garantirEmpresaUsuario({
+  const { empresa: crcom } = await garantirEmpresaUsuario({
     email: "celso@crcom.com",
     nome: "Celso",
     papel: "AGENCY_CEO",
@@ -112,26 +112,32 @@ async function main() {
   });
 
   // 5. FCM como cliente da crcom (Celso gerencia FCM, não tem acesso à Cholet)
-  const clienteExistente = await prisma.clienteAgencia.findFirst({
+  await prisma.relacionamentoGestao.deleteMany({
+    where: { agenciaId: crcom.id, empresaClienteId: fcm.id },
+  });
+  await prisma.clienteAgencia.deleteMany({
     where: { agenciaId: crcom.id, empresaConectadaId: fcm.id },
   });
 
-  if (!clienteExistente) {
-    await prisma.clienteAgencia.create({
-      data: {
-        agenciaId: crcom.id,
-        nome: "FCM",
-        empresaConectadaId: fcm.id,
-        status: "ativo",
-        responsavelId: celso.id,
-      },
-    });
-  } else {
-    await prisma.clienteAgencia.update({
-      where: { id: clienteExistente.id },
-      data: { nome: "FCM", status: "ativo", responsavelId: celso.id },
-    });
-  }
+  const senhaOperador = await bcrypt.hash("12346", 10);
+  await prisma.usuario.upsert({
+    where: { email: "funcionario@fcm.com" },
+    update: {
+      nome: "Operador FCM",
+      papel: "DATA_OPERATOR",
+      senhaHash: senhaOperador,
+      status: "ativo",
+      empresaId: fcm.id,
+    },
+    create: {
+      nome: "Operador FCM",
+      email: "funcionario@fcm.com",
+      papel: "DATA_OPERATOR",
+      senhaHash: senhaOperador,
+      status: "ativo",
+      empresaId: fcm.id,
+    },
+  });
 
   console.log("\nUsuários configurados:");
   console.log("  gleison@headstock.com | MASTER_PLATFORM | Headstock (agência/plataforma) | senha: 123456");

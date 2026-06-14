@@ -30,6 +30,12 @@ export function respostaErroApi(erro: unknown, mensagem: string) {
       { status: 401 }
     );
   }
+  if (erro instanceof Error && erro.message === "ACESSO_RESTRITO") {
+    return NextResponse.json(
+      { erro: "Acesso restrito ao seu perfil" },
+      { status: 403 }
+    );
+  }
 
   console.error(mensagem, erro);
   return NextResponse.json({ erro: mensagem }, { status: 500 });

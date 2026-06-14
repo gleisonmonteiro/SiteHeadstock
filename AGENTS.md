@@ -5,8 +5,15 @@
 Plataforma de gestão gerencial para agências de marketing e empresas de varejo. Três perfis distintos compartilham o mesmo codebase:
 
 - **MASTER_PLATFORM** (`gleison@headstock.com`) — CEO/dev da plataforma. Vê **todas** as agências e empresas. Dashboard em `/master` mostra overview global, saúde por agência, alertas críticos, gauge de infraestrutura Vercel→AWS e feed de atividade. Pode enviar "cards" para qualquer agência.
-- **AGÊNCIA** (`celso@crcom.com`) — CEO de agência cliente. Vê **apenas** sua agência e seus clientes. Importa dados do Operand ag. Nunca vê outras agências.
-- **VAREJO** (`raphael@fcm.com`) — dashboard comercial: vendas, metas, estoque, contas a pagar/receber, OCR.
+- **AGÊNCIAS** (`celso@crcom.com` e `gleison@radiolawifi.com`) — CEOs de agências independentes. Cada um vê somente sua agência e seus clientes.
+- **VAREJO CEO** (`raphael@fcm.com`, `zac@cholet.com`) — dashboards comerciais e operacionais da própria empresa.
+- **VAREJO OPERACIONAL** (`funcionario@fcm.com`) — importa dados e movimenta OPs, sem vendas, metas ou financeiro.
+
+Relacionamentos de apresentação:
+
+- FCM é independente e não pertence à CRcom.
+- Cholet é cliente conectado exclusivamente da Radiola WiFi.
+- `gleison@headstock.com` e `gleison@radiolawifi.com` são identidades distintas.
 
 Redirect pós-login: `MASTER_PLATFORM`/`MASTER_CONSULTANT` → `/master`; `AGENCIA` → `/agencia`; demais → `/dashboard`.
 
@@ -21,7 +28,7 @@ Redirect pós-login: `MASTER_PLATFORM`/`MASTER_CONSULTANT` → `/master`; `AGENC
 
 ## Stack e convenções
 
-- **Next.js 15 App Router** — as APIs podem divergir do treinamento. Leia `node_modules/next/dist/docs/` antes de criar rotas novas.
+- **Next.js 16 App Router** — as APIs podem divergir do treinamento. Leia `node_modules/next/dist/docs/` antes de criar rotas novas.
 - Páginas interativas: `"use client"` obrigatório no topo.
 - Rotas de API: `app/api/*/route.ts`, exportando `GET`/`POST` nomeados.
 - **Prisma** com output customizado em `.generated` — verifique os imports em cada service.
@@ -82,6 +89,9 @@ Timesheet: `op|ts|{slugUsuario}|{dateISO}|{numDoc}|{slugProjeto}` — upsert ide
 | `app/api/agencia/equipes/[id]/route.ts` | GET detalhe de equipe + apontamentos individuais |
 | `app/agencia/equipes/page.tsx` | UI: cards por time, upload Operand embutido |
 | `app/agencia/equipes/[id]/page.tsx` | UI: KPIs + drill-down por membro |
+| `app/services/campanhaService.ts` | Campanhas, métricas de atribuição, decisão de rota e snapshot de card |
+| `app/api/agencia/campanhas/route.ts` | GET visão executiva; POST cadastro, métricas, estratégia e cards |
+| `app/agencia/campanhas/page.tsx` | UI de Performance de Campanhas e exportação do card em PNG |
 
 ### Varejo (Raphael/Zac)
 | Arquivo | Responsabilidade |
@@ -120,9 +130,19 @@ Redirect pós-login: `AGENCIA` → `/agencia`; demais → `/dashboard`.
 | Papel | Acesso |
 |-------|--------|
 | `COMPANY_OWNER` | Tudo: dashboards financeiros, OPs, importação, configurações |
-| `DATA_OPERATOR` | Apenas: movimentação de OPs (`/producao/operacional`) e importação de Excel de produção |
+| `DATA_OPERATOR` | Movimentação de OPs e importações por módulo; sem dashboards, vendas, metas ou financeiro |
 
-**Sidebar** — `DATA_OPERATOR` só vê "Movimentação de OPs" e "Configurações". Todas as rotas financeiras (vendas, metas, contas a pagar/receber, dashboard) devem bloquear `DATA_OPERATOR` com `{ erro: "Acesso restrito", status: 403 }`.
+**Sidebar** — `DATA_OPERATOR` vê "Movimentação de OPs", "Importar Dados" e "Configurações". Todas as rotas decisórias devem bloquear perfis operacionais no servidor.
+
+Somente `MASTER_PLATFORM`, `AGENCY_CEO` e `COMPANY_OWNER` acessam vendas e
+visões decisórias. CEOs também podem executar rotinas operacionais.
+
+## Importações e TOTVS
+
+- A disposição permanece separada por produtos, estoque, pagar, receber e vendas.
+- `Empresa.usaTotvs` inicia falsa.
+- Ao marcar Planilha TOTVS e concluir uma importação, a preferência fica salva.
+- Clientes sem TOTVS usam layout próprio no mesmo módulo de importação.
 
 ### Modelos de produção
 
@@ -145,6 +165,8 @@ Programação padrão criada automaticamente no primeiro import: CORTE → COST.
 Empresa → Usuario (many)
 Empresa → ClienteAgencia (many)    ← carteira de clientes da agência
 ClienteAgencia → Projeto (many)
+ClienteAgencia → CampanhaMarketing → MetricaCampanha
+CampanhaMarketing → CardCampanha
 Projeto → Job (many)
 ApontamentoHora → Projeto? → ClienteAgencia?
 Equipe → EquipeMembro → Usuario

@@ -8,10 +8,13 @@ import {
   validarColunas,
 } from "@/services/importVendasService";
 import { VendaInput } from "@/types";
+import { exigirAcessoImportacao } from "@/lib/access";
 
 export async function POST(request: NextRequest) {
   try {
-    const { empresaId } = await exigirUsuarioSessao(request);
+    const usuario = await exigirUsuarioSessao(request);
+    exigirAcessoImportacao(usuario.papel);
+    const { empresaId } = usuario;
     const formData = await request.formData();
     const arquivo = formData.get("arquivo") as File;
 

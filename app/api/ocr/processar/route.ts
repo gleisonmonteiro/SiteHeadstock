@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { exigirUsuarioSessao, respostaErroApi } from "@/lib/session";
+import { exigirAcessoDecisao } from "@/lib/access";
 import {
   confirmarComprovanteOCR,
   descartarComprovanteOCR,
@@ -8,7 +9,9 @@ import {
 
 export async function POST(request: NextRequest) {
   try {
-    const { empresaId } = await exigirUsuarioSessao(request);
+    const usuario = await exigirUsuarioSessao(request);
+    exigirAcessoDecisao(usuario.papel);
+    const { empresaId } = usuario;
     const { comprovanteOCRId, acao, dados } = await request.json();
 
     if (!comprovanteOCRId || !acao) {

@@ -1,582 +1,564 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { DashboardLayout } from "@/components/DashboardLayout";
+import { useEffect, useMemo, useState } from "react";
 import {
-  AreaChart,
   Area,
+  AreaChart,
+  CartesianGrid,
+  ResponsiveContainer,
+  Tooltip,
   XAxis,
   YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
 } from "recharts";
-
-// ── Formatadores ───────────────────────────────────────────────────────────────
+import { DashboardLayout } from "@/components/DashboardLayout";
+import {
+  BIBarList,
+  BIBadge,
+  BIDataTable,
+  BIKpi,
+  BISection,
+  BITabs,
+} from "@/components/bi/BIKit";
 
 const moeda = new Intl.NumberFormat("pt-BR", {
   style: "currency",
   currency: "BRL",
   maximumFractionDigits: 0,
 });
-const moedaDec = new Intl.NumberFormat("pt-BR", {
+const moedaDecimal = new Intl.NumberFormat("pt-BR", {
   style: "currency",
   currency: "BRL",
 });
 const inteiro = new Intl.NumberFormat("pt-BR");
 
-// ── Gauge semicircular ─────────────────────────────────────────────────────────
-
-function GaugeMeta({
-  pct,
-  realizado,
-  meta,
-}: {
-  pct: number;
-  realizado: number;
-  meta: number;
-}) {
-  const p = Math.min(Math.max(pct, 0.5), 100);
-  const angle = (1 - p / 100) * Math.PI;
-  const ex = (100 + 80 * Math.cos(angle)).toFixed(2);
-  const ey = (100 - 80 * Math.sin(angle)).toFixed(2);
-  const largeArc = p > 50 ? 1 : 0;
-  const cor =
-    pct >= 100
-      ? "#C8F34D"
-      : pct >= 80
-        ? "#73d9cb"
-        : pct >= 50
-          ? "#e6c071"
-          : "#ef8e78";
-  const superou = realizado > meta;
-  const diff = Math.abs(meta - realizado);
-
-  return (
-    <div className="flex flex-col items-center">
-      <svg viewBox="0 0 200 108" className="w-full max-w-[260px]">
-        <path
-          d="M 20 100 A 80 80 0 0 1 180 100"
-          fill="none"
-          stroke="#1F3A3A"
-          strokeWidth="18"
-          strokeLinecap="round"
-        />
-        <path
-          d={`M 20 100 A 80 80 0 ${largeArc} 1 ${ex} ${ey}`}
-          fill="none"
-          stroke={cor}
-          strokeWidth="18"
-          strokeLinecap="round"
-        />
-        <text
-          x="100"
-          y="75"
-          textAnchor="middle"
-          fontSize="30"
-          fontWeight="900"
-          fill={cor}
-        >
-          {pct}%
-        </text>
-        <text x="100" y="93" textAnchor="middle" fontSize="10" fill="#789b96">
-          da meta atingida
-        </text>
-      </svg>
-      <div className="mt-3 grid w-full max-w-[260px] grid-cols-3 gap-2 text-center text-[11px]">
-        <div className="rounded-lg border border-[#1F3A3A] p-2">
-          <p className="text-sm font-extrabold text-white">
-            {moeda.format(realizado)}
-          </p>
-          <p className="mt-0.5 text-[#789b96]">Realizado</p>
-        </div>
-        <div className="rounded-lg border border-[#1F3A3A] p-2">
-          <p className="text-sm font-extrabold text-[#e6c071]">
-            {moeda.format(meta)}
-          </p>
-          <p className="mt-0.5 text-[#789b96]">Meta</p>
-        </div>
-        <div className="rounded-lg border border-[#1F3A3A] p-2">
-          <p
-            className={`text-sm font-extrabold ${superou ? "text-[#C8F34D]" : "text-[#ef8e78]"}`}
-          >
-            {moeda.format(diff)}
-          </p>
-          <p className="mt-0.5 text-[#789b96]">{superou ? "Superou" : "Faltam"}</p>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ── KPI card ───────────────────────────────────────────────────────────────────
-
-function Kpi({
-  rotulo,
-  valor,
-  delta,
-  deltaLabel,
-  highlight,
-}: {
-  rotulo: string;
-  valor: string;
-  delta?: number | null;
-  deltaLabel?: string;
-  highlight?: boolean;
-}) {
-  return (
-    <article
-      className={`rounded-xl border p-4 ${
-        highlight
-          ? "border-[#73d9cb]/35 bg-[#73d9cb]/8"
-          : "border-[#1F3A3A] bg-[#0F2A2A]"
-      }`}
-    >
-      <p className="text-[10px] font-extrabold uppercase tracking-wider text-[#789b96]">
-        {rotulo}
-      </p>
-      <strong className="mt-2 block text-xl font-extrabold leading-tight text-white">
-        {valor}
-      </strong>
-      {delta !== undefined && delta !== null && (
-        <p
-          className={`mt-1.5 flex items-center gap-1 text-[11px] font-semibold ${
-            delta > 0
-              ? "text-[#73d9cb]"
-              : delta < 0
-                ? "text-[#ef8e78]"
-                : "text-[#789b96]"
-          }`}
-        >
-          <span>{delta > 0 ? "▲" : delta < 0 ? "▼" : "—"}</span>
-          <span>
-            {Math.abs(delta).toFixed(1)}% {deltaLabel}
-          </span>
-        </p>
-      )}
-    </article>
-  );
-}
-
-// ── Barra vendedor ─────────────────────────────────────────────────────────────
-
-function BarraVendedor({
-  vendedor,
-  realizado,
-  meta,
-  pct,
-  qtd,
-}: {
-  vendedor: string;
-  realizado: number;
-  meta: number;
-  pct: number | null;
-  qtd: number;
-}) {
-  const p = Math.min(pct ?? 0, 100);
-  const cor =
-    p >= 100
-      ? "#C8F34D"
-      : p >= 80
-        ? "#73d9cb"
-        : p >= 50
-          ? "#e6c071"
-          : "#ef8e78";
-
-  return (
-    <div className="space-y-1.5">
-      <div className="flex items-center justify-between text-[11px]">
-        <span className="font-semibold text-white">{vendedor}</span>
-        <span className="text-[#789b96]">
-          {moeda.format(realizado)}{" "}
-          {meta > 0 && (
-            <span className="text-[#3a5a5a]">/ {moeda.format(meta)}</span>
-          )}
-        </span>
-      </div>
-      <div className="relative h-2 overflow-hidden rounded-full bg-[#1F3A3A]">
-        <div
-          className="h-full rounded-full transition-all duration-700"
-          style={{ width: `${p}%`, backgroundColor: cor }}
-        />
-      </div>
-      <div className="flex justify-between text-[10px] text-[#789b96]">
-        <span style={{ color: cor }}>
-          {pct !== null ? `${pct}% da meta` : "sem meta cadastrada"}
-        </span>
-        <span>{inteiro.format(qtd)} atendimentos</span>
-      </div>
-    </div>
-  );
-}
-
-// ── Tipos ──────────────────────────────────────────────────────────────────────
-
-interface Analytics {
-  faturamentoMes: number;
-  faturamentoMesAnoAnterior: number;
-  variacaoAnual: number | null;
+type LinhaAnalitica = {
+  nome: string;
+  valor: number;
+  quantidade: number;
+  transacoes: number;
   ticketMedio: number;
-  qtdVendas: number;
-  qtdHoje: number;
-  vendasHoje: number;
-  vendasOntem: number;
-  variacaoHoje: number | null;
-  vendasSemana: number;
-  vendasSemanaPassada: number;
-  variacaoSemana: number | null;
-  metaMensal: number;
-  pctMeta: number;
-  tendencia90Dias: { data: string; atual: number; anterior: number }[];
-  faturamentoDiaSemana: { dia: string; valor: number; qtd: number }[];
-  rankingClientes: {
-    cliente: string;
-    valor: number;
-    qtd: number;
-    diasSemVenda: number;
-  }[];
-  desempenhoVendedores: {
-    vendedor: string;
-    realizado: number;
-    meta: number;
-    pct: number | null;
-    qtd: number;
-  }[];
+  precoMedio: number;
+  clientes: number;
+  custo: number;
+  custoPct: number;
+};
+
+type ProdutoABC = LinhaAnalitica & {
+  participacao: number;
+  classe: "A" | "B" | "C";
+};
+
+type Vendedor = LinhaAnalitica & {
+  meta: number;
+  percentualMeta: number | null;
+};
+
+type Analytics = {
+  periodo: string;
+  atualizadoEm: string;
+  resumo: {
+    faturamento: number;
+    faturamentoAnterior: number;
+    variacaoFaturamento: number | null;
+    quantidade: number;
+    quantidadeAnterior: number;
+    variacaoQuantidade: number | null;
+    transacoes: number;
+    clientes: number;
+    ticketMedio: number;
+    precoMedio: number;
+    custo: number;
+    custoPct: number;
+    metaMensal: number;
+    faturamentoMes: number;
+    percentualMeta: number;
+  };
+  porLoja: LinhaAnalitica[];
+  porMarca: LinhaAnalitica[];
+  porCategoria: LinhaAnalitica[];
+  produtosABC: ProdutoABC[];
+  porVendedor: Vendedor[];
+  porCliente: LinhaAnalitica[];
+  historicoMensal: Array<{ mes: string; valor: number; quantidade: number; clientes: number }>;
+  historicoDiario: Array<{ data: string; valor: number }>;
+};
+
+type Aba = "geral" | "filiais" | "vendedores" | "clientes" | "produtos";
+
+function MetaGauge({ percentual }: { percentual: number }) {
+  const valor = Math.min(Math.max(percentual, 0), 100);
+  const graus = -90 + valor * 1.8;
+  const cor =
+    percentual >= 100
+      ? "#C8F34D"
+      : percentual >= 80
+        ? "#73d9cb"
+        : percentual >= 50
+          ? "#e6c071"
+          : "#ef8e78";
+
+  return (
+    <div className="relative mx-auto h-36 w-64 overflow-hidden">
+      <div className="absolute left-5 top-5 h-52 w-52 rounded-full border-[20px] border-[var(--bg-panel-soft)]" />
+      <div
+        className="absolute left-1/2 top-[116px] h-1.5 w-[86px] origin-left rounded-full"
+        style={{ backgroundColor: cor, transform: `rotate(${graus}deg)` }}
+      />
+      <div className="absolute left-[122px] top-[111px] h-4 w-4 rounded-full bg-[var(--text-primary)]" />
+      <div className="absolute inset-x-0 top-16 text-center">
+        <strong className="text-3xl font-black" style={{ color: cor }}>
+          {percentual.toFixed(1)}%
+        </strong>
+        <p className="text-[9px] font-extrabold uppercase tracking-[0.16em] text-[var(--text-secondary)]">
+          da meta mensal
+        </p>
+      </div>
+    </div>
+  );
 }
 
-// ── Page ───────────────────────────────────────────────────────────────────────
+function tabelaAnalitica(linhas: LinhaAnalitica[]) {
+  return linhas.map((linha) => ({
+    id: linha.nome,
+    nome: <span className="font-bold text-[var(--text-primary)]">{linha.nome}</span>,
+    valor: moedaDecimal.format(linha.valor),
+    quantidade: inteiro.format(linha.quantidade),
+    precoMedio: moedaDecimal.format(linha.precoMedio),
+    ticketMedio: moedaDecimal.format(linha.ticketMedio),
+    clientes: inteiro.format(linha.clientes),
+    custo: moedaDecimal.format(linha.custo),
+    custoPct: `${linha.custoPct.toFixed(1)}%`,
+  }));
+}
+
+const colunasAnaliticas = [
+  { key: "nome", label: "Descrição" },
+  { key: "valor", label: "Valor", align: "right" as const },
+  { key: "quantidade", label: "Qtde", align: "right" as const },
+  { key: "precoMedio", label: "Preço médio", align: "right" as const },
+  { key: "ticketMedio", label: "Ticket médio", align: "right" as const },
+  { key: "clientes", label: "Clientes", align: "right" as const },
+  { key: "custo", label: "Custo", align: "right" as const },
+  { key: "custoPct", label: "% custo", align: "right" as const },
+];
 
 export default function VendasPage() {
+  const [aba, setAba] = useState<Aba>("geral");
+  const [periodo, setPeriodo] = useState("90");
   const [dados, setDados] = useState<Analytics | null>(null);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState("");
 
   useEffect(() => {
-    fetch("/api/vendas/analytics")
-      .then((r) => r.json())
-      .then((d: Analytics & { erro?: string }) => {
-        if (d.erro) setErro(d.erro);
-        else setDados(d);
-      })
-      .catch(() => setErro("Erro ao conectar com o servidor"))
-      .finally(() => setCarregando(false));
-  }, []);
+    let ativo = true;
+    async function carregar() {
+      setCarregando(true);
+      setErro("");
+      try {
+        const resposta = await fetch(`/api/vendas/analytics?periodo=${periodo}`);
+        const resultado = await resposta.json();
+        if (!resposta.ok) throw new Error(resultado.erro ?? "Erro ao carregar vendas");
+        if (ativo) setDados(resultado);
+      } catch (falha) {
+        if (ativo) setErro(falha instanceof Error ? falha.message : "Erro ao carregar vendas");
+      } finally {
+        if (ativo) setCarregando(false);
+      }
+    }
+    void carregar();
+    return () => {
+      ativo = false;
+    };
+  }, [periodo]);
 
-  const maxDia = dados
-    ? Math.max(...dados.faturamentoDiaSemana.map((d) => d.valor), 1)
-    : 1;
-  const maxCliente =
-    dados && dados.rankingClientes.length > 0
-      ? dados.rankingClientes[0].valor
-      : 1;
+  const resumo = dados?.resumo;
+  const maxHistorico = useMemo(
+    () => Math.max(...(dados?.historicoDiario.map((item) => item.valor) ?? [1]), 1),
+    [dados],
+  );
 
   return (
     <DashboardLayout
-      titulo="Inteligência Comercial"
-      descricao="Análise estratégica de vendas · últimos 90 dias e mês atual"
+      titulo="Faturamento e Análise Comercial"
+      descricao="Receita, filiais, vendedores, clientes, mix e curva ABC"
     >
-      {carregando && (
-        <div className="space-y-3">
-          {Array.from({ length: 5 }).map((_, i) => (
-            <div
-              key={i}
-              className="h-20 animate-pulse rounded-xl border border-[#1F3A3A] bg-[#0F2A2A]"
+      <div className="space-y-3">
+        <div className="flex flex-col gap-2 xl:flex-row xl:items-center xl:justify-between">
+          <div className="overflow-x-auto">
+            <BITabs
+              value={aba}
+              onChange={setAba}
+              items={[
+                { id: "geral", label: "Geral" },
+                { id: "filiais", label: "Filiais e marcas" },
+                { id: "vendedores", label: "Vendedores" },
+                { id: "clientes", label: "Clientes" },
+                { id: "produtos", label: "Produtos e ABC" },
+              ]}
             />
-          ))}
-        </div>
-      )}
-
-      {erro && (
-        <div className="rounded-lg border border-[#ef8e78]/30 bg-[#ef8e78]/10 p-4 text-sm text-[#ef8e78]">
-          {erro}
-        </div>
-      )}
-
-      {dados && (
-        <div className="space-y-4">
-          {/* ── KPI strip ─────────────────────────────────────────────────── */}
-          <section className="grid grid-cols-2 gap-2 xl:grid-cols-6">
-            <Kpi
-              rotulo="Faturamento do mês"
-              valor={moeda.format(dados.faturamentoMes)}
-              delta={dados.variacaoAnual}
-              deltaLabel="vs mesmo mês do ano anterior"
-              highlight
-            />
-            <Kpi
-              rotulo="Ticket médio"
-              valor={moedaDec.format(dados.ticketMedio)}
-            />
-            <Kpi
-              rotulo="Atendimentos no mês"
-              valor={inteiro.format(dados.qtdVendas)}
-            />
-            <Kpi
-              rotulo="Faturamento hoje"
-              valor={moeda.format(dados.vendasHoje)}
-              delta={dados.variacaoHoje}
-              deltaLabel="vs ontem"
-            />
-            <Kpi
-              rotulo="Esta semana"
-              valor={moeda.format(dados.vendasSemana)}
-              delta={dados.variacaoSemana}
-              deltaLabel="vs semana passada"
-            />
-            <Kpi
-              rotulo="Atendimentos hoje"
-              valor={inteiro.format(dados.qtdHoje)}
-            />
-          </section>
-
-          {/* ── Velocímetro + Dia da semana ───────────────────────────────── */}
-          <section className="grid gap-3 lg:grid-cols-5">
-            {/* Gauge */}
-            <div className="rounded-xl border border-[#1F3A3A] bg-[#0F2A2A] p-5 lg:col-span-2">
-              <p className="text-[10px] font-extrabold uppercase tracking-wider text-[#789b96]">
-                Velocímetro da Meta Mensal
-              </p>
-              <div className="mt-4">
-                <GaugeMeta
-                  pct={dados.pctMeta}
-                  realizado={dados.faturamentoMes}
-                  meta={dados.metaMensal}
-                />
-              </div>
-            </div>
-
-            {/* Faturamento por dia da semana */}
-            <div className="rounded-xl border border-[#1F3A3A] bg-[#0F2A2A] p-5 lg:col-span-3">
-              <p className="text-[10px] font-extrabold uppercase tracking-wider text-[#789b96]">
-                Faturamento por dia da semana
-              </p>
-              <p className="mb-4 mt-0.5 text-[11px] text-[#789b96]">
-                Acumulado dos últimos 90 dias
-              </p>
-              <div className="space-y-2.5">
-                {dados.faturamentoDiaSemana.map(({ dia, valor, qtd }) => {
-                  const isMelhor = valor === maxDia;
-                  return (
-                    <div key={dia} className="flex items-center gap-3">
-                      <span className="w-7 flex-shrink-0 text-right text-[11px] font-bold text-[#b3ceca]">
-                        {dia}
-                      </span>
-                      <div className="relative h-7 flex-1 overflow-hidden rounded-md bg-[#1F3A3A]">
-                        <div
-                          className="h-full rounded-md transition-all duration-700"
-                          style={{
-                            width: `${Math.max((valor / maxDia) * 100, 2)}%`,
-                            backgroundColor: isMelhor ? "#C8F34D" : "#73d9cb",
-                            opacity: isMelhor ? 1 : 0.7,
-                          }}
-                        />
-                        <span className="absolute inset-0 flex items-center px-2 text-[11px] font-semibold text-[#0A1F1F]">
-                          {isMelhor && "★ "}
-                          {moeda.format(valor)}
-                        </span>
-                      </div>
-                      <span className="w-16 flex-shrink-0 text-right text-[10px] text-[#789b96]">
-                        {inteiro.format(qtd)} atend.
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          </section>
-
-          {/* ── Tendência 90 dias vs ano anterior ─────────────────────────── */}
-          <section className="rounded-xl border border-[#1F3A3A] bg-[#0F2A2A] p-5">
-            <p className="text-[10px] font-extrabold uppercase tracking-wider text-[#789b96]">
-              Evolução · últimos 90 dias
-            </p>
-            <p className="mb-4 mt-0.5 text-[11px] text-[#789b96]">
-              Teal = período atual · Pontilhado amber = mesmo período do ano
-              anterior
-            </p>
-            <ResponsiveContainer width="100%" height={220}>
-              <AreaChart
-                data={dados.tendencia90Dias}
-                margin={{ top: 4, right: 4, bottom: 0, left: 0 }}
+          </div>
+          <div className="flex items-center gap-2 rounded-xl border border-[var(--border-col)] bg-[var(--bg-panel)] p-1 shadow-[var(--shadow-panel)]">
+            {[
+              ["30", "30 dias"],
+              ["90", "90 dias"],
+              ["365", "12 meses"],
+              ["all", "Todo histórico"],
+            ].map(([id, label]) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => setPeriodo(id)}
+                className={`rounded-lg px-2.5 py-1.5 text-[10px] font-bold ${
+                  periodo === id
+                    ? "bg-[#73d9cb]/16 text-[var(--accent)]"
+                    : "text-[var(--text-secondary)]"
+                }`}
               >
-                <defs>
-                  <linearGradient id="gradAtual" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#73d9cb" stopOpacity={0.2} />
-                    <stop offset="95%" stopColor="#73d9cb" stopOpacity={0} />
-                  </linearGradient>
-                  <linearGradient
-                    id="gradAnterior"
-                    x1="0"
-                    y1="0"
-                    x2="0"
-                    y2="1"
-                  >
-                    <stop offset="5%" stopColor="#e6c071" stopOpacity={0.12} />
-                    <stop offset="95%" stopColor="#e6c071" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#1F3A3A" />
-                <XAxis
-                  dataKey="data"
-                  stroke="#789b96"
-                  fontSize={10}
-                  tick={{ fill: "#789b96" }}
-                  tickLine={false}
-                  interval={14}
-                />
-                <YAxis
-                  stroke="#789b96"
-                  fontSize={10}
-                  tick={{ fill: "#789b96" }}
-                  tickLine={false}
-                  tickFormatter={(v: number) =>
-                    v >= 1000 ? `${(v / 1000).toFixed(0)}k` : String(v)
-                  }
-                />
-                <Tooltip
-                  contentStyle={{
-                    background: "#0F2A2A",
-                    border: "1px solid #1F3A3A",
-                    borderRadius: 8,
-                    fontSize: 11,
-                  }}
-                  formatter={(value: unknown, name: unknown) => [
-                    moedaDec.format(Number(value)),
-                    String(name) === "atual" ? "Período atual" : "Ano anterior",
-                  ]}
-                />
-                <Area
-                  type="monotone"
-                  dataKey="anterior"
-                  stroke="#e6c071"
-                  strokeWidth={1.5}
-                  fill="url(#gradAnterior)"
-                  strokeDasharray="4 2"
-                  dot={false}
-                  name="anterior"
-                />
-                <Area
-                  type="monotone"
-                  dataKey="atual"
-                  stroke="#73d9cb"
-                  strokeWidth={2.5}
-                  fill="url(#gradAtual)"
-                  dot={false}
-                  name="atual"
-                />
-              </AreaChart>
-            </ResponsiveContainer>
-          </section>
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
 
-          {/* ── Ranking clientes + Desempenho vendedores ──────────────────── */}
-          <section className="grid gap-3 lg:grid-cols-2">
-            {/* Ranking Clientes */}
-            <div className="rounded-xl border border-[#1F3A3A] bg-[#0F2A2A] p-5">
-              <p className="text-[10px] font-extrabold uppercase tracking-wider text-[#789b96]">
-                Ranking de Clientes
-              </p>
-              <p className="mb-4 mt-0.5 text-[11px] text-[#789b96]">
-                Top 10 por faturamento · últimos 90 dias
-              </p>
+        {carregando && (
+          <div className="grid grid-cols-2 gap-2 xl:grid-cols-6">
+            {Array.from({ length: 6 }).map((_, index) => (
+              <div
+                key={index}
+                className="h-24 animate-pulse rounded-xl border border-[var(--border-col)] bg-[var(--bg-panel)]"
+              />
+            ))}
+          </div>
+        )}
+
+        {erro && (
+          <div className="rounded-xl border border-[#ef8e78]/35 bg-[#ef8e78]/10 p-4 text-sm text-[#ef8e78]">
+            {erro}
+          </div>
+        )}
+
+        {dados && resumo && !carregando && (
+          <>
+            <section className="grid grid-cols-2 gap-2 md:grid-cols-3 xl:grid-cols-6">
+              <BIKpi
+                label="Valor faturado"
+                value={moeda.format(resumo.faturamento)}
+                delta={resumo.variacaoFaturamento}
+                detail="vs período anterior"
+                tone="accent"
+              />
+              <BIKpi
+                label="Quantidade"
+                value={inteiro.format(resumo.quantidade)}
+                delta={resumo.variacaoQuantidade}
+                detail="peças vendidas"
+              />
+              <BIKpi
+                label="Transações"
+                value={inteiro.format(resumo.transacoes)}
+                detail="documentos de venda"
+              />
+              <BIKpi
+                label="Clientes"
+                value={inteiro.format(resumo.clientes)}
+                detail="clientes identificados"
+              />
+              <BIKpi
+                label="Preço médio"
+                value={moedaDecimal.format(resumo.precoMedio)}
+                detail="valor por peça"
+              />
+              <BIKpi
+                label="Ticket médio"
+                value={moedaDecimal.format(resumo.ticketMedio)}
+                detail={`${resumo.custoPct.toFixed(1)}% de custo informado`}
+              />
+            </section>
+
+            {aba === "geral" && (
               <div className="space-y-3">
-                {dados.rankingClientes.map(
-                  ({ cliente, valor, qtd, diasSemVenda }, i) => (
-                    <div key={cliente} className="flex items-center gap-3">
-                      <span className="w-5 flex-shrink-0 text-center text-[11px] font-extrabold text-[#3a5a5a]">
-                        {i + 1}
-                      </span>
-                      <div className="min-w-0 flex-1">
-                        <div className="mb-1 flex items-center justify-between gap-2">
-                          <span className="truncate text-[11px] font-semibold text-white">
-                            {cliente}
-                          </span>
-                          <div className="flex flex-shrink-0 items-center gap-2">
-                            <span
-                              className={`rounded px-1.5 py-0.5 text-[9px] font-bold ${
-                                diasSemVenda === 0
-                                  ? "bg-[#73d9cb]/20 text-[#73d9cb]"
-                                  : diasSemVenda <= 7
-                                    ? "bg-[#73d9cb]/10 text-[#73d9cb]"
-                                    : diasSemVenda <= 30
-                                      ? "bg-[#e6c071]/15 text-[#e6c071]"
-                                      : "bg-[#ef8e78]/15 text-[#ef8e78]"
-                              }`}
-                            >
-                              {diasSemVenda === 0
-                                ? "hoje"
-                                : `${diasSemVenda}d sem compra`}
-                            </span>
-                            <span className="text-[11px] font-extrabold text-white">
-                              {moeda.format(valor)}
-                            </span>
-                          </div>
-                        </div>
-                        <div className="relative h-1 overflow-hidden rounded-full bg-[#1F3A3A]">
-                          <div
-                            className="h-full rounded-full bg-[#73d9cb]/60"
-                            style={{
-                              width: `${(valor / maxCliente) * 100}%`,
-                            }}
-                          />
-                        </div>
-                        <p className="mt-0.5 text-[10px] text-[#789b96]">
-                          {inteiro.format(qtd)} compras no período
+                <section className="grid gap-3 xl:grid-cols-[320px_1fr_1fr]">
+                  <BISection title="Meta do mês" subtitle="Realizado no mês atual">
+                    <MetaGauge percentual={resumo.percentualMeta} />
+                    <div className="grid grid-cols-2 gap-2 border-t border-[var(--border-col)] pt-3 text-center">
+                      <div>
+                        <p className="text-[9px] font-bold uppercase text-[var(--text-secondary)]">
+                          Realizado
                         </p>
+                        <strong className="text-sm">{moeda.format(resumo.faturamentoMes)}</strong>
+                      </div>
+                      <div>
+                        <p className="text-[9px] font-bold uppercase text-[var(--text-secondary)]">
+                          Meta
+                        </p>
+                        <strong className="text-sm">{moeda.format(resumo.metaMensal)}</strong>
                       </div>
                     </div>
-                  )
-                )}
-                {dados.rankingClientes.length === 0 && (
-                  <p className="py-4 text-center text-[11px] text-[#789b96]">
-                    Sem clientes identificados nos dados importados
-                  </p>
-                )}
-              </div>
-            </div>
-
-            {/* Desempenho Vendedores */}
-            <div className="rounded-xl border border-[#1F3A3A] bg-[#0F2A2A] p-5">
-              <p className="text-[10px] font-extrabold uppercase tracking-wider text-[#789b96]">
-                Desempenho dos Vendedores
-              </p>
-              <p className="mb-5 mt-0.5 text-[11px] text-[#789b96]">
-                Realizado vs meta · mês atual
-              </p>
-              <div className="space-y-5">
-                {dados.desempenhoVendedores.map((v) => (
-                  <BarraVendedor key={v.vendedor} {...v} />
-                ))}
-                {dados.desempenhoVendedores.length === 0 && (
-                  <p className="py-4 text-center text-[11px] text-[#789b96]">
-                    Sem dados no mês atual
-                  </p>
-                )}
-              </div>
-
-              {/* Legenda de cores */}
-              <div className="mt-6 flex flex-wrap gap-3 border-t border-[#1F3A3A] pt-4">
-                {[
-                  { cor: "#C8F34D", label: "≥ 100% meta" },
-                  { cor: "#73d9cb", label: "80–99%" },
-                  { cor: "#e6c071", label: "50–79%" },
-                  { cor: "#ef8e78", label: "< 50%" },
-                ].map(({ cor, label }) => (
-                  <span
-                    key={label}
-                    className="flex items-center gap-1.5 text-[10px] text-[#789b96]"
-                  >
-                    <span
-                      className="inline-block h-2 w-4 rounded-full"
-                      style={{ backgroundColor: cor }}
+                  </BISection>
+                  <BISection title="Faturamento por filial" subtitle="Participação no período">
+                    <BIBarList
+                      items={dados.porLoja.map((item) => ({
+                        label: item.nome,
+                        value: item.valor,
+                        detail: `${item.transacoes} vendas`,
+                      }))}
+                      formatValue={moeda.format}
+                      color="#1478ff"
                     />
-                    {label}
-                  </span>
-                ))}
+                  </BISection>
+                  <BISection title="Faturamento por marca" subtitle="Marcas com maior receita">
+                    <BIBarList
+                      items={dados.porMarca.map((item) => ({
+                        label: item.nome,
+                        value: item.valor,
+                        detail: `${inteiro.format(item.quantidade)} peças`,
+                      }))}
+                      formatValue={moeda.format}
+                      color="#00a9a5"
+                    />
+                  </BISection>
+                </section>
+
+                <BISection title="Histórico de faturamento" subtitle="Série diária do período selecionado">
+                  <ResponsiveContainer width="100%" height={250}>
+                    <AreaChart data={dados.historicoDiario}>
+                      <defs>
+                        <linearGradient id="vendasArea" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#1478ff" stopOpacity={0.35} />
+                          <stop offset="95%" stopColor="#1478ff" stopOpacity={0.02} />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke="var(--border-col)" />
+                      <XAxis
+                        dataKey="data"
+                        tickFormatter={(valor) => String(valor).slice(5)}
+                        tick={{ fontSize: 9, fill: "var(--text-secondary)" }}
+                        interval="preserveStartEnd"
+                      />
+                      <YAxis
+                        domain={[0, maxHistorico]}
+                        tickFormatter={(valor) => `${Math.round(Number(valor) / 1000)}k`}
+                        tick={{ fontSize: 9, fill: "var(--text-secondary)" }}
+                      />
+                      <Tooltip
+                        formatter={(valor) => moedaDecimal.format(Number(valor))}
+                        labelFormatter={(valor) =>
+                          new Date(`${valor}T12:00:00`).toLocaleDateString("pt-BR")
+                        }
+                      />
+                      <Area
+                        type="monotone"
+                        dataKey="valor"
+                        stroke="#1478ff"
+                        strokeWidth={2}
+                        fill="url(#vendasArea)"
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </BISection>
+
+                <BISection title="Resumo por filial" subtitle="Visão sintética de faturamento e eficiência">
+                  <BIDataTable columns={colunasAnaliticas} rows={tabelaAnalitica(dados.porLoja)} />
+                </BISection>
               </div>
-            </div>
-          </section>
-        </div>
-      )}
+            )}
+
+            {aba === "filiais" && (
+              <div className="space-y-3">
+                <section className="grid gap-3 lg:grid-cols-3">
+                  <BISection title="Filiais" subtitle="Ranking por faturamento">
+                    <BIBarList
+                      items={dados.porLoja.map((item) => ({ label: item.nome, value: item.valor }))}
+                      formatValue={moeda.format}
+                    />
+                  </BISection>
+                  <BISection title="Marcas" subtitle="Receita por marca">
+                    <BIBarList
+                      items={dados.porMarca.map((item) => ({ label: item.nome, value: item.valor }))}
+                      formatValue={moeda.format}
+                      color="#00a9a5"
+                    />
+                  </BISection>
+                  <BISection title="Grupos" subtitle="Receita por categoria">
+                    <BIBarList
+                      items={dados.porCategoria.map((item) => ({
+                        label: item.nome,
+                        value: item.valor,
+                      }))}
+                      formatValue={moeda.format}
+                      color="#7f68d9"
+                    />
+                  </BISection>
+                </section>
+                <BISection title="Tabela de faturamento por filial" subtitle="Valor, volume, preço, ticket, clientes e custo">
+                  <BIDataTable columns={colunasAnaliticas} rows={tabelaAnalitica(dados.porLoja)} />
+                </BISection>
+              </div>
+            )}
+
+            {aba === "vendedores" && (
+              <div className="space-y-3">
+                <section className="grid gap-3 xl:grid-cols-[420px_1fr]">
+                  <BISection title="Ranking de vendedores" subtitle="Faturamento no período">
+                    <BIBarList
+                      items={dados.porVendedor.map((item) => ({
+                        label: item.nome,
+                        value: item.valor,
+                        detail:
+                          item.percentualMeta === null
+                            ? "sem meta mensal"
+                            : `${item.percentualMeta.toFixed(1)}% da meta`,
+                      }))}
+                      formatValue={moeda.format}
+                      limit={12}
+                    />
+                  </BISection>
+                  <BISection title="Tabela por vendedor" subtitle="Desempenho comercial e meta do mês">
+                    <BIDataTable
+                      columns={[
+                        { key: "nome", label: "Vendedor" },
+                        { key: "valor", label: "Valor", align: "right" },
+                        { key: "participacao", label: "% valor", align: "right" },
+                        { key: "quantidade", label: "Qtde", align: "right" },
+                        { key: "precoMedio", label: "Preço médio", align: "right" },
+                        { key: "ticketMedio", label: "Ticket médio", align: "right" },
+                        { key: "clientes", label: "Clientes", align: "right" },
+                        { key: "meta", label: "Meta", align: "right" },
+                      ]}
+                      rows={dados.porVendedor.map((item) => ({
+                        id: item.nome,
+                        nome: <span className="font-bold">{item.nome}</span>,
+                        valor: moedaDecimal.format(item.valor),
+                        participacao: `${((item.valor / Math.max(resumo.faturamento, 1)) * 100).toFixed(1)}%`,
+                        quantidade: inteiro.format(item.quantidade),
+                        precoMedio: moedaDecimal.format(item.precoMedio),
+                        ticketMedio: moedaDecimal.format(item.ticketMedio),
+                        clientes: inteiro.format(item.clientes),
+                        meta:
+                          item.percentualMeta === null ? (
+                            <BIBadge>Sem meta</BIBadge>
+                          ) : (
+                            <BIBadge
+                              tone={
+                                item.percentualMeta >= 100
+                                  ? "success"
+                                  : item.percentualMeta >= 80
+                                    ? "accent"
+                                    : item.percentualMeta >= 50
+                                      ? "warning"
+                                      : "danger"
+                              }
+                            >
+                              {item.percentualMeta.toFixed(1)}%
+                            </BIBadge>
+                          ),
+                      }))}
+                    />
+                  </BISection>
+                </section>
+              </div>
+            )}
+
+            {aba === "clientes" && (
+              <div className="space-y-3">
+                <section className="grid gap-3 xl:grid-cols-[430px_1fr]">
+                  <BISection title="Maiores clientes" subtitle="Ranking por faturamento">
+                    <BIBarList
+                      items={dados.porCliente.map((item) => ({
+                        label: item.nome,
+                        value: item.valor,
+                        detail: `${item.transacoes} compras`,
+                      }))}
+                      formatValue={moeda.format}
+                      limit={14}
+                      color="#00a9a5"
+                    />
+                  </BISection>
+                  <BISection title="Tabela por cliente" subtitle="Receita, volume e comportamento de compra">
+                    <BIDataTable columns={colunasAnaliticas} rows={tabelaAnalitica(dados.porCliente)} />
+                  </BISection>
+                </section>
+                <BISection title="Histórico mensal" subtitle="Faturamento, quantidade e clientes ativos">
+                  <BIDataTable
+                    columns={[
+                      { key: "mes", label: "Mês" },
+                      { key: "valor", label: "Faturamento", align: "right" },
+                      { key: "quantidade", label: "Quantidade", align: "right" },
+                      { key: "clientes", label: "Clientes", align: "right" },
+                    ]}
+                    rows={dados.historicoMensal.map((item) => ({
+                      id: item.mes,
+                      mes: item.mes.split("-").reverse().join("/"),
+                      valor: moedaDecimal.format(item.valor),
+                      quantidade: inteiro.format(item.quantidade),
+                      clientes: inteiro.format(item.clientes),
+                    }))}
+                  />
+                </BISection>
+              </div>
+            )}
+
+            {aba === "produtos" && (
+              <div className="space-y-3">
+                <section className="grid gap-3 xl:grid-cols-[430px_1fr]">
+                  <BISection title="Grupos de produto" subtitle="Categorias com maior faturamento">
+                    <BIBarList
+                      items={dados.porCategoria.map((item) => ({
+                        label: item.nome,
+                        value: item.valor,
+                      }))}
+                      formatValue={moeda.format}
+                      limit={14}
+                      color="#7f68d9"
+                    />
+                  </BISection>
+                  <BISection title="Curva ABC por produto" subtitle="Classificação por participação acumulada">
+                    <BIDataTable
+                      columns={[
+                        { key: "classe", label: "ABC" },
+                        { key: "produto", label: "Produto" },
+                        { key: "valor", label: "Valor", align: "right" },
+                        { key: "participacao", label: "% valor", align: "right" },
+                        { key: "quantidade", label: "Qtde", align: "right" },
+                        { key: "precoMedio", label: "Preço médio", align: "right" },
+                        { key: "clientes", label: "Clientes", align: "right" },
+                        { key: "custoPct", label: "% custo", align: "right" },
+                      ]}
+                      rows={dados.produtosABC.map((item) => ({
+                        id: item.nome,
+                        classe: (
+                          <BIBadge
+                            tone={
+                              item.classe === "A"
+                                ? "success"
+                                : item.classe === "B"
+                                  ? "warning"
+                                  : "neutral"
+                            }
+                          >
+                            {item.classe}
+                          </BIBadge>
+                        ),
+                        produto: <span className="font-bold">{item.nome}</span>,
+                        valor: moedaDecimal.format(item.valor),
+                        participacao: `${item.participacao.toFixed(1)}%`,
+                        quantidade: inteiro.format(item.quantidade),
+                        precoMedio: moedaDecimal.format(item.precoMedio),
+                        clientes: inteiro.format(item.clientes),
+                        custoPct: `${item.custoPct.toFixed(1)}%`,
+                      }))}
+                    />
+                  </BISection>
+                </section>
+              </div>
+            )}
+
+            <p className="text-right text-[9px] text-[var(--text-secondary)]">
+              Dados atualizados em {new Date(dados.atualizadoEm).toLocaleString("pt-BR")}
+            </p>
+          </>
+        )}
+      </div>
     </DashboardLayout>
   );
 }

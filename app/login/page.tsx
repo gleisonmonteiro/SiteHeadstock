@@ -49,6 +49,11 @@ export default function LoginPage() {
       const destino =
         papel === "MASTER_PLATFORM" || papel === "MASTER_CONSULTANT"
           ? "/master"
+          : papel === "DATA_OPERATOR" || papel === "COMPANY_MANAGER"
+          ? "/producao/operacional"
+          : tipoEmpresa === "AGENCIA" &&
+              (papel === "AGENCY_MANAGER" || papel === "COLLABORATOR")
+          ? "/agencia/equipes"
           : tipoEmpresa === "AGENCIA"
           ? "/agencia"
           : "/dashboard";

@@ -21,6 +21,7 @@ export async function GET(request: NextRequest) {
       empresa: {
         nome: usuario.empresa.nome,
         tipo: usuario.empresa.tipo,
+        usaTotvs: usuario.empresa.usaTotvs,
       },
     },
   });

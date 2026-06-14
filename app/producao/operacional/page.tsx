@@ -65,7 +65,9 @@ export default function OperacionalPage() {
     }
   };
 
-  useEffect(() => { buscar(); }, []);
+  useEffect(() => {
+    void Promise.resolve().then(buscar);
+  }, []);
 
   const etapaAtual = (op: OP) => op.programacao.etapas.find((e) => e.id === op.etapaAtualId);
   const proximaEtapa = (op: OP) => {
@@ -117,7 +119,10 @@ export default function OperacionalPage() {
   };
 
   return (
-    <DashboardLayout>
+    <DashboardLayout
+      titulo="Movimentação de OPs"
+      descricao="Registro operacional de passagem entre etapas"
+    >
       <div className="min-h-screen bg-[var(--bg-dark)] p-6 text-[#f2fbf8]">
         <div className="mb-6">
           <h1 className="text-2xl font-bold text-[#73d9cb]">Movimentação de OPs</h1>

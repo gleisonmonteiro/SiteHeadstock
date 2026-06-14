@@ -5,9 +5,10 @@ import { obterEquipes } from "@/services/equipeService";
 export async function GET(request: NextRequest) {
   try {
     const usuario = await exigirUsuarioSessao(request);
-    const agenciaId =
-      request.nextUrl.searchParams.get("agenciaId") ?? usuario.empresaId;
-    const dados = await obterEquipes(agenciaId);
+    if (usuario.empresa.tipo !== "AGENCIA") {
+      return NextResponse.json({ erro: "Acesso restrito a agências" }, { status: 403 });
+    }
+    const dados = await obterEquipes(usuario.empresaId);
     return NextResponse.json(dados);
   } catch (erro) {
     return respostaErroApi(erro, "Erro ao buscar equipes");

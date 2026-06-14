@@ -13,6 +13,9 @@
     "db:seed-fcm": "tsx prisma/seed-fcm.ts",
     "db:seed-cholet": "tsx prisma/seed-cholet.ts",
     "db:seed-radiolawifi-clientes": "tsx prisma/seed-radiolawifi-clientes.ts",
+    "db:seed-radiolawifi-equipes": "tsx prisma/seed-radiolawifi-equipes.ts",
+    "db:seed-radiolawifi-campanhas": "tsx prisma/seed-radiolawifi-campanhas.ts",
+    "db:prepare-apresentacao": "tsx prisma/prepare-apresentacao.ts",
     "db:seed-crcom-equipes": "tsx prisma/seed-crcom-equipes.ts"
   },
   "dependencies": {

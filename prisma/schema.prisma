@@ -1,6 +1,6 @@
 generator client {
   provider = "prisma-client"
-  output = "../.generated"
+  output   = "../.generated"
 }
 
 datasource db {
@@ -55,6 +55,13 @@ enum StatusApontamento {
   REJEITADO
 }
 
+enum StatusCampanha {
+  PLANEJAMENTO
+  ATIVA
+  PAUSADA
+  ENCERRADA
+}
+
 enum StatusOP {
   AGUARDANDO
   EM_ANDAMENTO
@@ -69,6 +76,7 @@ model Empresa {
   slug         String?     @unique
   tipo         TipoEmpresa @default(VAREJO)
   status       String      @default("ativo")
+  usaTotvs     Boolean     @default(false)
   createdAt    DateTime    @default(now())
   updatedAt    DateTime    @updatedAt
 
@@ -94,30 +102,33 @@ model Empresa {
   contasReceber              ContaReceber[]
   programacoesOP             ProgramacaoOP[]
   ordensProducao             OrdemProducao[]
+  campanhas                  CampanhaMarketing[]
+  cardsCampanha              CardCampanha[]
 
   @@map("empresas")
 }
 
 model Usuario {
-  id        String   @id @default(cuid())
+  id        String       @id @default(cuid())
   nome      String
   email     String
   senhaHash String
-  status    String   @default("ativo")
+  status    String       @default("ativo")
   papel     PapelUsuario @default(COMPANY_OWNER)
   empresaId String
-  empresa   Empresa  @relation(fields: [empresaId], references: [id], onDelete: Cascade)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  empresa   Empresa      @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
 
   tokenssSenha          TokenSenha[]
-  equipesGerenciadas    Equipe[]             @relation("GestorEquipe")
+  equipesGerenciadas    Equipe[]              @relation("GestorEquipe")
   equipes               EquipeMembro[]
-  clientesResponsavel   ClienteAgencia[]     @relation("ResponsavelCliente")
-  projetosResponsavel   Projeto[]            @relation("ResponsavelProjeto")
+  clientesResponsavel   ClienteAgencia[]      @relation("ResponsavelCliente")
+  projetosResponsavel   Projeto[]             @relation("ResponsavelProjeto")
+  projetosParticipante  ProjetoParticipante[]
   apontamentosHora      ApontamentoHora[]
   atualizacoesProjeto   AtualizacaoProjeto[]
-  ordensProducaoCriadas OrdemProducao[]      @relation("CriadorOP")
+  ordensProducaoCriadas OrdemProducao[]       @relation("CriadorOP")
   movimentacoesOP       MovimentacaoOP[]
 
   @@unique([email])
@@ -125,19 +136,19 @@ model Usuario {
 }
 
 model RelacionamentoGestao {
-  id               String              @id @default(cuid())
+  id               String               @id @default(cuid())
   agenciaId        String
-  agencia          Empresa             @relation("AgenciaRelacionamentos", fields: [agenciaId], references: [id], onDelete: Cascade)
+  agencia          Empresa              @relation("AgenciaRelacionamentos", fields: [agenciaId], references: [id], onDelete: Cascade)
   empresaClienteId String
-  empresaCliente   Empresa             @relation("ClienteRelacionamentos", fields: [empresaClienteId], references: [id], onDelete: Cascade)
+  empresaCliente   Empresa              @relation("ClienteRelacionamentos", fields: [empresaClienteId], references: [id], onDelete: Cascade)
   status           StatusRelacionamento @default(PENDENTE)
-  escopos          String[]            @default([])
+  escopos          String[]             @default([])
   inicioEm         DateTime?
   fimEm            DateTime?
   autorizadoEm     DateTime?
   revogadoEm       DateTime?
-  createdAt        DateTime            @default(now())
-  updatedAt        DateTime            @updatedAt
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
 
   @@unique([agenciaId, empresaClienteId])
   @@index([empresaClienteId, status])
@@ -199,6 +210,8 @@ model ClienteAgencia {
   projetos         Projeto[]
   apontamentosHora ApontamentoHora[]
   jobs             Job[]
+  campanhas        CampanhaMarketing[]
+  cardsCampanha    CardCampanha[]
 
   @@unique([agenciaId, nome])
   @@unique([agenciaId, empresaConectadaId])
@@ -207,19 +220,19 @@ model ClienteAgencia {
 }
 
 model Projeto {
-  id                 String        @id @default(cuid())
+  id                 String         @id @default(cuid())
   agenciaId          String
-  agencia            Empresa       @relation(fields: [agenciaId], references: [id], onDelete: Cascade)
+  agencia            Empresa        @relation(fields: [agenciaId], references: [id], onDelete: Cascade)
   clienteId          String
   cliente            ClienteAgencia @relation(fields: [clienteId], references: [id], onDelete: Cascade)
   equipeId           String?
-  equipe             Equipe?       @relation(fields: [equipeId], references: [id], onDelete: SetNull)
+  equipe             Equipe?        @relation(fields: [equipeId], references: [id], onDelete: SetNull)
   responsavelId      String?
-  responsavel        Usuario?      @relation("ResponsavelProjeto", fields: [responsavelId], references: [id], onDelete: SetNull)
+  responsavel        Usuario?       @relation("ResponsavelProjeto", fields: [responsavelId], references: [id], onDelete: SetNull)
   nome               String
-  status             StatusProjeto @default(PLANEJAMENTO)
-  saude              SaudeProjeto  @default(NORMAL)
-  progresso          Int           @default(0)
+  status             StatusProjeto  @default(PLANEJAMENTO)
+  saude              SaudeProjeto   @default(NORMAL)
+  progresso          Int            @default(0)
   dataInicio         DateTime?
   prazo              DateTime?
   horasPrevistas     Float?
@@ -228,18 +241,33 @@ model Projeto {
   impedimento        String?
   idExterno          String?
   fonteImportacao    String?
-  createdAt          DateTime      @default(now())
-  updatedAt          DateTime      @updatedAt
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
 
-  apontamentos ApontamentoHora[]
-  atualizacoes AtualizacaoProjeto[]
-  jobs         Job[]
+  apontamentos  ApontamentoHora[]
+  atualizacoes  AtualizacaoProjeto[]
+  participantes ProjetoParticipante[]
+  jobs          Job[]
 
   @@unique([agenciaId, idExterno])
   @@index([agenciaId, status])
   @@index([clienteId])
   @@index([responsavelId])
   @@map("projetos")
+}
+
+model ProjetoParticipante {
+  id        String   @id @default(cuid())
+  projetoId String
+  projeto   Projeto  @relation(fields: [projetoId], references: [id], onDelete: Cascade)
+  usuarioId String
+  usuario   Usuario  @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  papel     String?
+  createdAt DateTime @default(now())
+
+  @@unique([projetoId, usuarioId])
+  @@index([usuarioId])
+  @@map("projeto_participantes")
 }
 
 model AtualizacaoProjeto {
@@ -289,6 +317,77 @@ model ApontamentoHora {
   @@map("apontamentos_hora")
 }
 
+model CampanhaMarketing {
+  id               String         @id @default(cuid())
+  agenciaId        String
+  agencia          Empresa        @relation(fields: [agenciaId], references: [id], onDelete: Cascade)
+  clienteId        String
+  cliente          ClienteAgencia @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  nome             String
+  objetivo         String
+  canal            String
+  status           StatusCampanha @default(PLANEJAMENTO)
+  dataInicio       DateTime       @db.Date
+  dataFim          DateTime?      @db.Date
+  orcamento        Float          @default(0)
+  custoOperacional Float          @default(0)
+  modeloAtribuicao String         @default("Nao informado")
+  fonteDados       String         @default("Preenchimento manual")
+  diagnostico      String?
+  recomendacao     String?
+  proximaAcao      String?
+  idExterno        String?
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+
+  metricas MetricaCampanha[]
+  cards    CardCampanha[]
+
+  @@unique([agenciaId, idExterno])
+  @@index([agenciaId, status])
+  @@index([clienteId])
+  @@map("campanhas_marketing")
+}
+
+model MetricaCampanha {
+  id               String            @id @default(cuid())
+  campanhaId       String
+  campanha         CampanhaMarketing @relation(fields: [campanhaId], references: [id], onDelete: Cascade)
+  data             DateTime          @db.Date
+  investimento     Float             @default(0)
+  impressoes       Int               @default(0)
+  alcance          Int               @default(0)
+  cliques          Int               @default(0)
+  leads            Int               @default(0)
+  conversoes       Int               @default(0)
+  receitaAtribuida Float             @default(0)
+  observacao       String?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+
+  @@unique([campanhaId, data])
+  @@index([campanhaId, data])
+  @@map("metricas_campanha")
+}
+
+model CardCampanha {
+  id         String             @id @default(cuid())
+  agenciaId  String
+  agencia    Empresa            @relation(fields: [agenciaId], references: [id], onDelete: Cascade)
+  clienteId  String
+  cliente    ClienteAgencia     @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  campanhaId String?
+  campanha   CampanhaMarketing? @relation(fields: [campanhaId], references: [id], onDelete: SetNull)
+  titulo     String
+  mensagem   String             @db.Text
+  dados      Json
+  createdAt  DateTime           @default(now())
+
+  @@index([agenciaId, createdAt])
+  @@index([clienteId])
+  @@map("cards_campanha")
+}
+
 model TokenSenha {
   id        String   @id @default(cuid())
   usuarioId String
@@ -319,31 +418,31 @@ model Upload {
 }
 
 model Venda {
-  id              String   @id @default(cuid())
-  empresaId       String
-  empresa         Empresa  @relation(fields: [empresaId], references: [id], onDelete: Cascade)
-  uploadId        String
-  upload          Upload   @relation(fields: [uploadId], references: [id], onDelete: Cascade)
-  dataVenda       DateTime
-  valorVenda      Float
-  produto         String
-  quantidade      Int
-  vendedor        String
-  cliente         String?
-  formaPagamento  String?
-  categoria       String?
-  marca           String?
-  custo           Float?
-  loja            String?
-  canalVenda      String?
-  desconto        Float?
+  id             String   @id @default(cuid())
+  empresaId      String
+  empresa        Empresa  @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  uploadId       String
+  upload         Upload   @relation(fields: [uploadId], references: [id], onDelete: Cascade)
+  dataVenda      DateTime
+  valorVenda     Float
+  produto        String
+  quantidade     Int
+  vendedor       String
+  cliente        String?
+  formaPagamento String?
+  categoria      String?
+  marca          String?
+  custo          Float?
+  loja           String?
+  canalVenda     String?
+  desconto       Float?
   // Campos extras do TOTVS (venda.txt)
-  cdProduto       String?
-  nrTransacao     String?
-  vlBruto         Float?
-  tpSituacao      String?
-  cdSeqgrupo      String?
-  createdAt       DateTime @default(now())
+  cdProduto      String?
+  nrTransacao    String?
+  vlBruto        Float?
+  tpSituacao     String?
+  cdSeqgrupo     String?
+  createdAt      DateTime @default(now())
 
   @@index([empresaId, dataVenda])
   @@index([empresaId, loja])
@@ -380,28 +479,28 @@ model MetaVendedor {
 }
 
 model CardExecutivo {
-  id              String   @id @default(cuid())
-  empresaId       String
-  empresa         Empresa  @relation(fields: [empresaId], references: [id], onDelete: Cascade)
-  tipo            String
-  dataReferencia  DateTime
-  mensagem        String   @db.Text
-  createdAt       DateTime @default(now())
+  id             String   @id @default(cuid())
+  empresaId      String
+  empresa        Empresa  @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  tipo           String
+  dataReferencia DateTime
+  mensagem       String   @db.Text
+  createdAt      DateTime @default(now())
 
   @@map("cards_executivos")
 }
 
 model ComprovanteOCR {
-  id             String   @id @default(cuid())
-  empresaId      String
-  empresa        Empresa  @relation(fields: [empresaId], references: [id], onDelete: Cascade)
-  nomeArquivo    String
-  urlArquivo     String
-  textoExtraido  String   @db.Text
-  status         String   @default("pendente_confirmacao")
-  confianca      Float?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  id            String   @id @default(cuid())
+  empresaId     String
+  empresa       Empresa  @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  nomeArquivo   String
+  urlArquivo    String
+  textoExtraido String   @db.Text
+  status        String   @default("pendente_confirmacao")
+  confianca     Float?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
   movimentos MovimentoOCR[]
 
@@ -409,9 +508,9 @@ model ComprovanteOCR {
 }
 
 model MovimentoOCR {
-  id               String   @id @default(cuid())
+  id               String         @id @default(cuid())
   empresaId        String
-  empresa          Empresa  @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  empresa          Empresa        @relation(fields: [empresaId], references: [id], onDelete: Cascade)
   comprovanteOCRId String
   comprovanteOCR   ComprovanteOCR @relation(fields: [comprovanteOCRId], references: [id], onDelete: Cascade)
   dataMovimento    DateTime
@@ -422,9 +521,9 @@ model MovimentoOCR {
   formaPagamento   String?
   categoria        String?
   tipoSugerido     String?
-  status           String   @default("confirmado")
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  status           String         @default("confirmado")
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
 
   @@map("movimentos_ocr")
 }
@@ -470,19 +569,19 @@ model ProdutoCatalogo {
 // Módulo: Estoque e Abastecimento (estoque.txt)
 // ──────────────────────────────────────────────
 model ItemEstoque {
-  id         String           @id @default(cuid())
-  empresaId  String
-  empresa    Empresa          @relation(fields: [empresaId], references: [id], onDelete: Cascade)
-  produtoId  String?
-  produto    ProdutoCatalogo? @relation(fields: [produtoId], references: [id], onDelete: SetNull)
-  cdProduto  String
-  loja       String?
-  dataRef    DateTime         @db.Date
-  estoque    Float            @default(0)
-  vlVenda    Float?
-  vlCusto    Float?
-  createdAt  DateTime         @default(now())
-  updatedAt  DateTime         @updatedAt
+  id        String           @id @default(cuid())
+  empresaId String
+  empresa   Empresa          @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  produtoId String?
+  produto   ProdutoCatalogo? @relation(fields: [produtoId], references: [id], onDelete: SetNull)
+  cdProduto String
+  loja      String?
+  dataRef   DateTime         @db.Date
+  estoque   Float            @default(0)
+  vlVenda   Float?
+  vlCusto   Float?
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
 
   @@unique([empresaId, cdProduto, loja, dataRef])
   @@index([empresaId, dataRef])

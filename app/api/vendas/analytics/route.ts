@@ -1,194 +1,243 @@
 import { NextRequest, NextResponse } from "next/server";
 import { exigirUsuarioSessao, respostaErroApi } from "@/lib/session";
+import { exigirAcessoDecisao } from "@/lib/access";
 import { prisma } from "@/lib/prisma";
+
+type VendaAnalitica = {
+  dataVenda: Date;
+  valorVenda: number;
+  quantidade: number;
+  vendedor: string;
+  cliente: string | null;
+  produto: string;
+  categoria: string | null;
+  marca: string | null;
+  loja: string | null;
+  custo: number | null;
+  desconto: number | null;
+};
+
+function arredondar(valor: number, casas = 2) {
+  const fator = 10 ** casas;
+  return Math.round(valor * fator) / fator;
+}
+
+function percentual(parte: number, total: number) {
+  return total > 0 ? arredondar((parte / total) * 100, 1) : 0;
+}
+
+function chaveMes(data: Date) {
+  return `${data.getFullYear()}-${String(data.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function agregar(
+  vendas: VendaAnalitica[],
+  chave: (venda: VendaAnalitica) => string,
+) {
+  const mapa = new Map<
+    string,
+    { valor: number; quantidade: number; transacoes: number; custo: number; clientes: Set<string> }
+  >();
+
+  for (const venda of vendas) {
+    const nome = chave(venda) || "Não informado";
+    const atual = mapa.get(nome) ?? {
+      valor: 0,
+      quantidade: 0,
+      transacoes: 0,
+      custo: 0,
+      clientes: new Set<string>(),
+    };
+    atual.valor += venda.valorVenda;
+    atual.quantidade += venda.quantidade;
+    atual.transacoes++;
+    atual.custo += venda.custo ?? 0;
+    if (venda.cliente) atual.clientes.add(venda.cliente);
+    mapa.set(nome, atual);
+  }
+
+  return Array.from(mapa.entries())
+    .map(([nome, item]) => ({
+      nome,
+      valor: arredondar(item.valor),
+      quantidade: item.quantidade,
+      transacoes: item.transacoes,
+      ticketMedio: arredondar(item.valor / Math.max(item.transacoes, 1)),
+      precoMedio: arredondar(item.valor / Math.max(item.quantidade, 1)),
+      clientes: item.clientes.size,
+      custo: arredondar(item.custo),
+      custoPct: percentual(item.custo, item.valor),
+    }))
+    .sort((a, b) => b.valor - a.valor);
+}
 
 export async function GET(request: NextRequest) {
   try {
     const usuario = await exigirUsuarioSessao(request);
-    const empresaId = usuario.empresaId;
+    exigirAcessoDecisao(usuario.papel);
 
     const agora = new Date();
-    const mesAtual = agora.getMonth() + 1;
-    const anoAtual = agora.getFullYear();
+    const periodo = request.nextUrl.searchParams.get("periodo") ?? "90";
+    const dias = periodo === "365" ? 365 : periodo === "30" ? 30 : periodo === "all" ? null : 90;
+    const inicio = dias ? new Date(agora.getTime() - dias * 86_400_000) : undefined;
+    const inicioComparacao = inicio
+      ? new Date(inicio.getFullYear() - 1, inicio.getMonth(), inicio.getDate())
+      : undefined;
+    const fimComparacao = new Date(
+      agora.getFullYear() - 1,
+      agora.getMonth(),
+      agora.getDate(),
+      23,
+      59,
+      59,
+      999,
+    );
 
-    const inicioMes = new Date(anoAtual, mesAtual - 1, 1);
-    const inicioMesAnoAnt = new Date(anoAtual - 1, mesAtual - 1, 1);
-    const fimMesAnoAnt = new Date(anoAtual - 1, mesAtual, 0, 23, 59, 59, 999);
-
-    const hoje = new Date(anoAtual, agora.getMonth(), agora.getDate());
-    const amanha = new Date(anoAtual, agora.getMonth(), agora.getDate() + 1);
-    const ontem = new Date(anoAtual, agora.getMonth(), agora.getDate() - 1);
-
-    const dow = agora.getDay();
-    const diasParaSegunda = dow === 0 ? 6 : dow - 1;
-    const inicioSemana = new Date(anoAtual, agora.getMonth(), agora.getDate() - diasParaSegunda);
-    const inicioSemanaPassada = new Date(inicioSemana.getTime() - 7 * 86400000);
-    const fimSemanaPassada = new Date(inicioSemana.getTime() - 1);
-
-    const inicio90 = new Date(agora.getTime() - 90 * 86400000);
-    const inicio90AnoAnt = new Date(inicio90.getTime() - 365 * 86400000);
-    const fim90AnoAnt = new Date(agora.getTime() - 365 * 86400000);
-
-    const [vendasRecentes, vendasMesAnoAnt, vendas90AnoAnt, metaMes, metasVend] = await Promise.all([
+    const [vendas, vendasAnoAnterior, metaMes, metasVendedor] = await Promise.all([
       prisma.venda.findMany({
-        where: { empresaId, dataVenda: { gte: inicio90 } },
-        select: { dataVenda: true, valorVenda: true, vendedor: true, cliente: true, quantidade: true },
+        where: {
+          empresaId: usuario.empresaId,
+          ...(inicio ? { dataVenda: { gte: inicio } } : {}),
+        },
+        select: {
+          dataVenda: true,
+          valorVenda: true,
+          quantidade: true,
+          vendedor: true,
+          cliente: true,
+          produto: true,
+          categoria: true,
+          marca: true,
+          loja: true,
+          custo: true,
+          desconto: true,
+        },
         orderBy: { dataVenda: "asc" },
       }),
-      prisma.venda.findMany({
-        where: { empresaId, dataVenda: { gte: inicioMesAnoAnt, lte: fimMesAnoAnt } },
-        select: { valorVenda: true },
+      inicioComparacao
+        ? prisma.venda.findMany({
+            where: {
+              empresaId: usuario.empresaId,
+              dataVenda: { gte: inicioComparacao, lte: fimComparacao },
+            },
+            select: { valorVenda: true, quantidade: true },
+          })
+        : Promise.resolve([]),
+      prisma.meta.findFirst({
+        where: {
+          empresaId: usuario.empresaId,
+          mes: agora.getMonth() + 1,
+          ano: agora.getFullYear(),
+        },
       }),
-      prisma.venda.findMany({
-        where: { empresaId, dataVenda: { gte: inicio90AnoAnt, lte: fim90AnoAnt } },
-        select: { dataVenda: true, valorVenda: true },
+      prisma.metaVendedor.findMany({
+        where: {
+          empresaId: usuario.empresaId,
+          mes: agora.getMonth() + 1,
+          ano: agora.getFullYear(),
+        },
       }),
-      prisma.meta.findFirst({ where: { empresaId, mes: mesAtual, ano: anoAtual } }),
-      prisma.metaVendedor.findMany({ where: { empresaId, mes: mesAtual, ano: anoAtual } }),
     ]);
 
-    // KPIs do mês atual (filtrado do range de 90 dias)
-    const vendasMes = vendasRecentes.filter((v) => v.dataVenda >= inicioMes);
-    const faturamentoMes = vendasMes.reduce((s, v) => s + v.valorVenda, 0);
-    const qtdMes = vendasMes.length;
-    const ticketMedio = qtdMes > 0 ? faturamentoMes / qtdMes : 0;
+    const faturamento = vendas.reduce((soma, venda) => soma + venda.valorVenda, 0);
+    const quantidade = vendas.reduce((soma, venda) => soma + venda.quantidade, 0);
+    const custo = vendas.reduce((soma, venda) => soma + (venda.custo ?? 0), 0);
+    const clientes = new Set(vendas.map((venda) => venda.cliente).filter(Boolean)).size;
+    const faturamentoAnterior = vendasAnoAnterior.reduce(
+      (soma, venda) => soma + venda.valorVenda,
+      0,
+    );
+    const quantidadeAnterior = vendasAnoAnterior.reduce(
+      (soma, venda) => soma + venda.quantidade,
+      0,
+    );
 
-    const fatMesAnoAnt = vendasMesAnoAnt.reduce((s, v) => s + v.valorVenda, 0);
-    const variacaoAnual =
-      fatMesAnoAnt > 0
-        ? Math.round(((faturamentoMes - fatMesAnoAnt) / fatMesAnoAnt) * 1000) / 10
-        : null;
+    const porLoja = agregar(vendas, (venda) => venda.loja ?? "Sem filial");
+    const porMarca = agregar(vendas, (venda) => venda.marca ?? "Sem marca");
+    const porCategoria = agregar(vendas, (venda) => venda.categoria ?? "Sem grupo");
+    const porProduto = agregar(vendas, (venda) => venda.produto);
+    const porCliente = agregar(vendas, (venda) => venda.cliente ?? "Sem identificação");
 
-    // Comparações rápidas
-    const vendasHoje = vendasRecentes
-      .filter((v) => v.dataVenda >= hoje && v.dataVenda < amanha)
-      .reduce((s, v) => s + v.valorVenda, 0);
-    const qtdHoje = vendasRecentes.filter(
-      (v) => v.dataVenda >= hoje && v.dataVenda < amanha
-    ).length;
-    const vendasOntem = vendasRecentes
-      .filter((v) => v.dataVenda >= ontem && v.dataVenda < hoje)
-      .reduce((s, v) => s + v.valorVenda, 0);
-    const variacaoHoje =
-      vendasOntem > 0
-        ? Math.round(((vendasHoje - vendasOntem) / vendasOntem) * 1000) / 10
-        : null;
+    let acumuladoABC = 0;
+    const produtosABC = porProduto.map((produto) => {
+      acumuladoABC += percentual(produto.valor, faturamento);
+      const classe = acumuladoABC <= 80 ? "A" : acumuladoABC <= 95 ? "B" : "C";
+      return { ...produto, participacao: percentual(produto.valor, faturamento), classe };
+    });
 
-    const vendasSemana = vendasRecentes
-      .filter((v) => v.dataVenda >= inicioSemana)
-      .reduce((s, v) => s + v.valorVenda, 0);
-    const vendasSemanaPassada = vendasRecentes
-      .filter((v) => v.dataVenda >= inicioSemanaPassada && v.dataVenda <= fimSemanaPassada)
-      .reduce((s, v) => s + v.valorVenda, 0);
-    const variacaoSemana =
-      vendasSemanaPassada > 0
-        ? Math.round(((vendasSemana - vendasSemanaPassada) / vendasSemanaPassada) * 1000) / 10
-        : null;
-
-    // Meta mensal
-    const metaMensal = metaMes?.valorMeta ?? 0;
-    const pctMeta = metaMensal > 0 ? Math.round((faturamentoMes / metaMensal) * 100) : 0;
-
-    // Tendência 90 dias: série diária com comparação ao ano anterior
-    const por90Dia = new Map<string, number>();
-    for (let i = 0; i < 90; i++) {
-      const d = new Date(inicio90.getTime() + i * 86400000);
-      por90Dia.set(d.toISOString().slice(0, 10), 0);
+    const mapaMes = new Map<string, { valor: number; quantidade: number; clientes: Set<string> }>();
+    for (const venda of vendas) {
+      const chave = chaveMes(venda.dataVenda);
+      const atual = mapaMes.get(chave) ?? { valor: 0, quantidade: 0, clientes: new Set<string>() };
+      atual.valor += venda.valorVenda;
+      atual.quantidade += venda.quantidade;
+      if (venda.cliente) atual.clientes.add(venda.cliente);
+      mapaMes.set(chave, atual);
     }
-    vendasRecentes.forEach((v) => {
-      const k = v.dataVenda.toISOString().slice(0, 10);
-      if (por90Dia.has(k)) por90Dia.set(k, (por90Dia.get(k)!) + v.valorVenda);
-    });
-    const porAnoAnt = new Map<string, number>();
-    vendas90AnoAnt.forEach((v) => {
-      const shifted = new Date(v.dataVenda.getTime() + 365 * 86400000);
-      const k = shifted.toISOString().slice(0, 10);
-      porAnoAnt.set(k, (porAnoAnt.get(k) ?? 0) + v.valorVenda);
-    });
-    const tendencia90Dias = Array.from(por90Dia.entries()).map(([data, valor]) => ({
-      data: data.slice(5),
-      atual: Math.round(valor),
-      anterior: Math.round(porAnoAnt.get(data) ?? 0),
+    const historicoMensal = Array.from(mapaMes.entries()).map(([mes, item]) => ({
+      mes,
+      valor: arredondar(item.valor),
+      quantidade: item.quantidade,
+      clientes: item.clientes.size,
     }));
 
-    // Faturamento por dia da semana (últimos 90 dias)
-    const nomesDia = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
-    const somaDia = [0, 0, 0, 0, 0, 0, 0];
-    const contDia = [0, 0, 0, 0, 0, 0, 0];
-    vendasRecentes.forEach((v) => {
-      const d = v.dataVenda.getDay();
-      somaDia[d] += v.valorVenda;
-      contDia[d]++;
-    });
-    // Reordenar: Seg a Dom
-    const faturamentoDiaSemana = [1, 2, 3, 4, 5, 6, 0].map((d) => ({
-      dia: nomesDia[d],
-      valor: Math.round(somaDia[d]),
-      qtd: contDia[d],
+    const mapaDia = new Map<string, number>();
+    for (const venda of vendas) {
+      const chave = venda.dataVenda.toISOString().slice(0, 10);
+      mapaDia.set(chave, (mapaDia.get(chave) ?? 0) + venda.valorVenda);
+    }
+    const historicoDiario = Array.from(mapaDia.entries()).map(([data, valor]) => ({
+      data,
+      valor: arredondar(valor),
     }));
 
-    // Ranking de clientes (top 10, últimos 90 dias)
-    const porCliente = new Map<string, { valor: number; qtd: number; ultima: Date }>();
-    vendasRecentes.forEach((v) => {
-      const key = v.cliente ?? "Sem identificação";
-      const cur = porCliente.get(key);
-      if (!cur) {
-        porCliente.set(key, { valor: v.valorVenda, qtd: 1, ultima: v.dataVenda });
-      } else {
-        cur.valor += v.valorVenda;
-        cur.qtd++;
-        if (v.dataVenda > cur.ultima) cur.ultima = v.dataVenda;
-      }
+    const inicioMes = new Date(agora.getFullYear(), agora.getMonth(), 1);
+    const vendasMes = vendas.filter((venda) => venda.dataVenda >= inicioMes);
+    const faturamentoMes = vendasMes.reduce((soma, venda) => soma + venda.valorVenda, 0);
+    const desempenhoVendedores = agregar(vendasMes, (venda) => venda.vendedor).map((item) => {
+      const meta = metasVendedor.find((registro) => registro.vendedor === item.nome)?.valorMeta ?? 0;
+      return {
+        ...item,
+        meta: arredondar(meta),
+        percentualMeta: meta > 0 ? percentual(item.valor, meta) : null,
+      };
     });
-    const rankingClientes = Array.from(porCliente.entries())
-      .map(([cliente, { valor, qtd, ultima }]) => ({
-        cliente,
-        valor: Math.round(valor),
-        qtd,
-        diasSemVenda: Math.floor((agora.getTime() - ultima.getTime()) / 86400000),
-      }))
-      .sort((a, b) => b.valor - a.valor)
-      .slice(0, 10);
-
-    // Desempenho vendedores vs meta (mês atual)
-    const porVendedor = new Map<string, { valor: number; qtd: number }>();
-    vendasMes.forEach((v) => {
-      const cur = porVendedor.get(v.vendedor);
-      if (!cur) porVendedor.set(v.vendedor, { valor: v.valorVenda, qtd: 1 });
-      else { cur.valor += v.valorVenda; cur.qtd++; }
-    });
-    const desempenhoVendedores = Array.from(porVendedor.entries())
-      .map(([vendedor, { valor, qtd }]) => {
-        const meta = metasVend.find((m) => m.vendedor === vendedor)?.valorMeta ?? 0;
-        return {
-          vendedor,
-          realizado: Math.round(valor),
-          meta: Math.round(meta),
-          pct: meta > 0 ? Math.round((valor / meta) * 100) : null,
-          qtd,
-        };
-      })
-      .sort((a, b) => b.realizado - a.realizado);
 
     return NextResponse.json({
-      faturamentoMes: Math.round(faturamentoMes),
-      faturamentoMesAnoAnterior: Math.round(fatMesAnoAnt),
-      variacaoAnual,
-      ticketMedio: Math.round(ticketMedio),
-      qtdVendas: qtdMes,
-      qtdHoje,
-      vendasHoje: Math.round(vendasHoje),
-      vendasOntem: Math.round(vendasOntem),
-      variacaoHoje,
-      vendasSemana: Math.round(vendasSemana),
-      vendasSemanaPassada: Math.round(vendasSemanaPassada),
-      variacaoSemana,
-      metaMensal: Math.round(metaMensal),
-      pctMeta,
-      tendencia90Dias,
-      faturamentoDiaSemana,
-      rankingClientes,
-      desempenhoVendedores,
+      periodo,
+      atualizadoEm: agora,
+      resumo: {
+        faturamento: arredondar(faturamento),
+        faturamentoAnterior: arredondar(faturamentoAnterior),
+        variacaoFaturamento:
+          faturamentoAnterior > 0
+            ? percentual(faturamento - faturamentoAnterior, faturamentoAnterior)
+            : null,
+        quantidade,
+        quantidadeAnterior,
+        variacaoQuantidade:
+          quantidadeAnterior > 0
+            ? percentual(quantidade - quantidadeAnterior, quantidadeAnterior)
+            : null,
+        transacoes: vendas.length,
+        clientes,
+        ticketMedio: arredondar(faturamento / Math.max(vendas.length, 1)),
+        precoMedio: arredondar(faturamento / Math.max(quantidade, 1)),
+        custo: arredondar(custo),
+        custoPct: percentual(custo, faturamento),
+        metaMensal: arredondar(metaMes?.valorMeta ?? 0),
+        faturamentoMes: arredondar(faturamentoMes),
+        percentualMeta:
+          metaMes?.valorMeta ? percentual(faturamentoMes, metaMes.valorMeta) : 0,
+      },
+      porLoja,
+      porMarca,
+      porCategoria,
+      produtosABC,
+      porVendedor: desempenhoVendedores,
+      porCliente,
+      historicoMensal,
+      historicoDiario,
     });
   } catch (erro) {
     return respostaErroApi(erro, "Erro ao obter analytics de vendas");

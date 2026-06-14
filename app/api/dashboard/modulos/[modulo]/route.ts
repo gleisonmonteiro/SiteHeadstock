@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { exigirUsuarioSessao, respostaErroApi } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
+import { exigirAcessoDecisao } from "@/lib/access";
 import { kpisProdutos, kpisEstoque, kpisContasPagar, kpisContasReceber } from "@/services/modulosService";
 
 export async function GET(
@@ -9,6 +10,7 @@ export async function GET(
 ) {
   try {
     const usuario = await exigirUsuarioSessao(request);
+    exigirAcessoDecisao(usuario.papel);
     const { modulo } = await params;
 
     const param = request.nextUrl.searchParams.get("empresaId");

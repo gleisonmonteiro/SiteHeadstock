@@ -6,10 +6,13 @@ import {
   obterVendedoresUnicos,
   salvarMeta,
 } from "@/services/metaService";
+import { exigirAcessoDecisao } from "@/lib/access";
 
 export async function GET(request: NextRequest) {
   try {
-    const { empresaId } = await exigirUsuarioSessao(request);
+    const usuario = await exigirUsuarioSessao(request);
+    exigirAcessoDecisao(usuario.papel);
+    const { empresaId } = usuario;
     const mes = request.nextUrl.searchParams.get("mes");
     const ano = request.nextUrl.searchParams.get("ano");
 
@@ -34,7 +37,9 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const { empresaId } = await exigirUsuarioSessao(request);
+    const usuario = await exigirUsuarioSessao(request);
+    exigirAcessoDecisao(usuario.papel);
+    const { empresaId } = usuario;
     const { mes, ano, valorMeta, tipo } = await request.json();
 
     if (!mes || !ano || !valorMeta) {

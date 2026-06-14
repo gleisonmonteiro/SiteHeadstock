@@ -73,32 +73,104 @@ export async function kpisEstoque(empresaId: string) {
 
   const itens = await prisma.itemEstoque.findMany({
     where: { empresaId, dataRef: ultimaData.dataRef },
-    select: { estoque: true, vlVenda: true, vlCusto: true },
+    select: {
+      cdProduto: true,
+      loja: true,
+      estoque: true,
+      vlVenda: true,
+      vlCusto: true,
+      produto: {
+        select: {
+          referencia: true,
+          descricao: true,
+          marca: true,
+          grupo: true,
+        },
+      },
+    },
   });
 
   let valorEstoque = 0;
+  let valorEstoqueVarejo = 0;
   let unidades = 0;
   let rupturas = 0;
   let excesso = 0;
+  const dimensoes = {
+    loja: new Map<string, { quantidade: number; custo: number; varejo: number; rupturas: number; posicoes: number }>(),
+    marca: new Map<string, number>(),
+    grupo: new Map<string, number>(),
+    referencia: new Map<string, number>(),
+  };
 
   for (const item of itens) {
     unidades += item.estoque;
     valorEstoque += item.estoque * (item.vlCusto ?? item.vlVenda ?? 0);
+    valorEstoqueVarejo += item.estoque * (item.vlVenda ?? 0);
     if (item.estoque === 0) rupturas++;
     if (item.estoque > 30) excesso++;
+
+    const loja = item.loja ?? "Sem filial";
+    const atualLoja = dimensoes.loja.get(loja) ?? {
+      quantidade: 0,
+      custo: 0,
+      varejo: 0,
+      rupturas: 0,
+      posicoes: 0,
+    };
+    atualLoja.quantidade += item.estoque;
+    atualLoja.custo += item.estoque * (item.vlCusto ?? item.vlVenda ?? 0);
+    atualLoja.varejo += item.estoque * (item.vlVenda ?? 0);
+    atualLoja.rupturas += item.estoque === 0 ? 1 : 0;
+    atualLoja.posicoes++;
+    dimensoes.loja.set(loja, atualLoja);
+
+    const marca = item.produto?.marca ?? "Sem marca";
+    const grupo = item.produto?.grupo ?? "Sem grupo";
+    const referencia =
+      item.produto?.referencia ??
+      item.produto?.descricao ??
+      item.cdProduto;
+    dimensoes.marca.set(marca, (dimensoes.marca.get(marca) ?? 0) + item.estoque);
+    dimensoes.grupo.set(grupo, (dimensoes.grupo.get(grupo) ?? 0) + item.estoque);
+    dimensoes.referencia.set(
+      referencia,
+      (dimensoes.referencia.get(referencia) ?? 0) + item.estoque,
+    );
   }
 
   const totalPosicoes = itens.length;
+  const ordenarMapa = (mapa: Map<string, number>) =>
+    Array.from(mapa.entries())
+      .map(([nome, valor]) => ({ nome, valor: arred(valor) }))
+      .sort((a, b) => b.valor - a.valor);
 
   return {
     temDados: true,
     valorEstoque: arred(valorEstoque),
+    valorEstoqueVarejo: arred(valorEstoqueVarejo),
     unidades: Math.round(unidades),
     rupturas,
     rupturasPct: pct(rupturas, totalPosicoes),
     excesso,
     dataRef: ultimaData.dataRef,
     totalPosicoes,
+    precoMedioCusto: unidades > 0 ? arred(valorEstoque / unidades) : 0,
+    precoMedioVarejo: unidades > 0 ? arred(valorEstoqueVarejo / unidades) : 0,
+    porLoja: Array.from(dimensoes.loja.entries())
+      .map(([nome, item]) => ({
+        nome,
+        quantidade: arred(item.quantidade),
+        custo: arred(item.custo),
+        varejo: arred(item.varejo),
+        precoMedioCusto: item.quantidade > 0 ? arred(item.custo / item.quantidade) : 0,
+        precoMedioVarejo: item.quantidade > 0 ? arred(item.varejo / item.quantidade) : 0,
+        rupturas: item.rupturas,
+        rupturasPct: pct(item.rupturas, item.posicoes),
+      }))
+      .sort((a, b) => b.quantidade - a.quantidade),
+    porMarca: ordenarMapa(dimensoes.marca),
+    porGrupo: ordenarMapa(dimensoes.grupo),
+    porReferencia: ordenarMapa(dimensoes.referencia).slice(0, 20),
   };
 }
 

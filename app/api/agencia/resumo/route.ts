@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { exigirUsuarioSessao, respostaErroApi } from "@/lib/session";
 import { obterResumoAgencia } from "@/services/agenciaService";
+import { exigirAcessoDecisao } from "@/lib/access";
 
 export async function GET(request: NextRequest) {
   try {
     const usuario = await exigirUsuarioSessao(request);
+    exigirAcessoDecisao(usuario.papel);
 
     const isMaster = ["MASTER_PLATFORM", "MASTER_CONSULTANT"].includes(usuario.papel);
 

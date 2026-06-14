@@ -16,6 +16,7 @@ import {
   YAxis,
 } from "recharts";
 import { DashboardLayout } from "@/components/DashboardLayout";
+import { EstoqueDashboard } from "@/components/bi/EstoqueDashboard";
 import {
   dashboardModules,
   getDashboardModule,
@@ -68,6 +69,7 @@ const moeda = new Intl.NumberFormat("pt-BR", {
 
 const inteiro = new Intl.NumberFormat("pt-BR");
 const cores = ["#73d9cb", "#e6c071", "#8bb8ff", "#ef8e78", "#a78bfa"];
+const MODULOS_COM_API = ["produtos", "estoque", "pagar", "receber"] as const;
 
 const subscribeStorage = (callback: () => void) => {
   window.addEventListener("storage", callback);
@@ -265,26 +267,28 @@ export default function DashboardPage() {
     void carregar();
   }, [agencia, empresaIdEfetivo]);
 
-  const MODULOS_COM_API = ["produtos", "estoque", "pagar", "receber"] as const;
-
   useEffect(() => {
     if (!MODULOS_COM_API.includes(moduloAtivo as never)) {
-      setDadosModulo(null);
       return;
     }
     if (agencia && !empresaIdEfetivo) {
-      setDadosModulo(null);
       return;
     }
-    setCarregandoModulo(true);
-    const url = empresaIdEfetivo
-      ? `/api/dashboard/modulos/${moduloAtivo}?empresaId=${empresaIdEfetivo}`
-      : `/api/dashboard/modulos/${moduloAtivo}`;
-    fetch(url)
-      .then((r) => r.json())
-      .then((d) => setDadosModulo(d))
-      .catch(() => setDadosModulo(null))
-      .finally(() => setCarregandoModulo(false));
+    const carregar = async () => {
+      setCarregandoModulo(true);
+      const url = empresaIdEfetivo
+        ? `/api/dashboard/modulos/${moduloAtivo}?empresaId=${empresaIdEfetivo}`
+        : `/api/dashboard/modulos/${moduloAtivo}`;
+      try {
+        const resposta = await fetch(url);
+        setDadosModulo(await resposta.json());
+      } catch {
+        setDadosModulo(null);
+      } finally {
+        setCarregandoModulo(false);
+      }
+    };
+    void Promise.resolve().then(carregar);
   }, [moduloAtivo, agencia, empresaIdEfetivo]);
   const modulo = useMemo(
     () => (moduloAtivo === "resumo" ? null : getDashboardModule(moduloAtivo)),
@@ -308,7 +312,7 @@ export default function DashboardPage() {
                 Modelo canônico Headstock
               </span>
               <span className="rounded border border-[var(--border-col)] bg-[var(--bg-panel-soft)] px-2 py-1 text-[9px] font-bold text-[var(--text-secondary)]">
-                Conector inicial: TOTVS Moda
+                Conectores configuráveis por empresa
               </span>
             </div>
             <p className="mt-2 max-w-3xl text-xs text-[var(--text-secondary)]">
@@ -602,7 +606,17 @@ export default function DashboardPage() {
               <div className="h-24 animate-pulse rounded-lg border border-[var(--border-col)] bg-[var(--bg-panel)]" />
             )}
 
-            {!carregandoModulo && dadosModulo && !!(dadosModulo as Record<string, unknown>).temDados && (
+            {!carregandoModulo &&
+              modulo.id === "estoque" &&
+              dadosModulo &&
+              !!(dadosModulo as Record<string, unknown>).temDados && (
+                <EstoqueDashboard dados={dadosModulo as unknown as Parameters<typeof EstoqueDashboard>[0]["dados"]} />
+              )}
+
+            {!carregandoModulo &&
+              modulo.id !== "estoque" &&
+              dadosModulo &&
+              !!(dadosModulo as Record<string, unknown>).temDados && (
               <section className="grid grid-cols-2 gap-2 xl:grid-cols-3">
                 <KpisModulo id={modulo.id} dados={dadosModulo} />
               </section>

@@ -9,6 +9,7 @@ const icons: Record<string, React.ReactNode> = {
   master: <><path d="M12 2L2 7l10 5 10-5-10-5z" /><path d="M2 17l10 5 10-5" /><path d="M2 12l10 5 10-5" /></>,
   agencia: <><path d="M3 21h18" /><path d="M5 21V7l7-4 7 4v14" /><path d="M9 21v-6h6v6" /><path d="M9 9h.01M15 9h.01" /></>,
   equipes: <><circle cx="9" cy="7" r="4" /><path d="M3 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /><path d="M21 21v-2a4 4 0 0 0-3-3.85" /></>,
+  campanhas: <><path d="M3 11v2" /><path d="M6 9v6" /><path d="M9 7v10" /><path d="M12 10v4" /><path d="M15 5v14" /><path d="M18 8v8" /><path d="M21 3v18" /></>,
   upload: <><path d="M12 16V4" /><path d="m7 9 5-5 5 5" /><path d="M5 20h14" /></>,
   vendas: <><path d="M4 19V9" /><path d="M10 19V5" /><path d="M16 19v-7" /><path d="M22 19H2" /></>,
   metas: <><circle cx="12" cy="12" r="8" /><circle cx="12" cy="12" r="3" /><path d="M12 2v3M22 12h-3" /></>,
@@ -26,6 +27,7 @@ const subscribeStorage = (callback: () => void) => {
 
 let _dadosCache = { tipo: "", papel: "" };
 let _rawCache = "";
+const DADOS_USUARIO_VAZIOS = { tipo: "", papel: "" };
 
 const getUsuarioDados = () => {
   try {
@@ -53,44 +55,62 @@ export function Sidebar() {
   const { tipo: tipoEmpresa, papel } = useSyncExternalStore(
     subscribeStorage,
     getUsuarioDados,
-    () => ({ tipo: "", papel: "" })
+    () => DADOS_USUARIO_VAZIOS
   );
   const isMaster = papel === "MASTER_PLATFORM" || papel === "MASTER_CONSULTANT";
-  const isOperacional = papel === "DATA_OPERATOR";
-  const isCeo = papel === "COMPANY_OWNER" || papel === "COMPANY_MANAGER";
+  const isDonoPlataforma = papel === "MASTER_PLATFORM";
+  const isCeoAgencia = papel === "AGENCY_CEO";
+  const isCeoEmpresa = papel === "COMPANY_OWNER";
+  const isOperacionalEmpresa =
+    papel === "DATA_OPERATOR" || papel === "COMPANY_MANAGER";
   const isVarejo = tipoEmpresa === "VAREJO" || tipoEmpresa === "SERVICOS" || tipoEmpresa === "OUTRA";
+  const podeImportar = [
+    "MASTER_PLATFORM",
+    "AGENCY_CEO",
+    "AGENCY_MANAGER",
+    "COLLABORATOR",
+    "COMPANY_OWNER",
+    "COMPANY_MANAGER",
+    "DATA_OPERATOR",
+  ].includes(papel);
 
   const menuItems = [
     ...(isMaster
       ? [{ label: "Painel Master", href: "/master", icon: "master" }]
       : []),
-    ...(tipoEmpresa === "AGENCIA" && !isMaster
+    ...(tipoEmpresa === "AGENCIA" && !isMaster && isCeoAgencia
       ? [
           { label: "Visão da Agência", href: "/agencia", icon: "agencia" },
           { label: "Equipes", href: "/agencia/equipes", icon: "equipes" },
+          { label: "Performance de Campanhas", href: "/agencia/campanhas", icon: "campanhas" },
         ]
       : []),
     // Operacional só vê movimentação de OPs
-    ...(isOperacional && isVarejo
+    ...(tipoEmpresa === "AGENCIA" && !isMaster && !isCeoAgencia
+      ? [{ label: "Equipes", href: "/agencia/equipes", icon: "equipes" }]
+      : []),
+    ...(isOperacionalEmpresa && isVarejo
       ? [{ label: "Movimentação de OPs", href: "/producao/operacional", icon: "operacional" }]
       : []),
     // CEO vê tudo (exceto views exclusivas de operacional)
-    ...(isCeo && isVarejo
+    ...(isCeoEmpresa && isVarejo
       ? [{ label: "Produção", href: "/producao", icon: "producao" }]
       : []),
-    ...(!isOperacional
+    ...(isDonoPlataforma || isCeoAgencia || isCeoEmpresa
       ? [
           {
             label: tipoEmpresa === "AGENCIA" ? "Clientes e Dados" : "Inteligência",
             href: "/dashboard",
             icon: "dashboard",
           },
-          { label: "Importar Dados", href: "/uploads", icon: "upload" },
           { label: "Vendas", href: "/vendas", icon: "vendas" },
           { label: "Metas", href: "/metas", icon: "metas" },
           { label: "Card Executivo", href: "/card-executivo", icon: "card" },
           { label: "OCR / Comprovantes", href: "/ocr-comprovantes", icon: "ocr" },
         ]
+      : []),
+    ...(podeImportar
+      ? [{ label: "Importar Dados", href: "/uploads", icon: "upload" }]
       : []),
     { label: "Configurações", href: "/configuracoes", icon: "config" },
   ];

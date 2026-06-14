@@ -15,7 +15,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const { proximaEtapaId, concluir, observacao } = body;
 
     if (concluir) {
-      await concluirOP(usuario.empresaId, id, usuario.id);
+      await concluirOP(usuario.empresaId, id);
       return NextResponse.json({ sucesso: true, status: "CONCLUIDA" });
     }
 
