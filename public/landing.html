@@ -513,6 +513,72 @@ footer a { color:var(--t); text-decoration:none; }
 .reveal.in { opacity:1; transform:none; }
 
 /* ══════════════════════════════════════
+   INTEGRACOES
+══════════════════════════════════════ */
+.integra {
+  padding:120px 48px 80px;
+  border-top:1px solid rgba(0,200,215,.06);
+  position:relative; z-index:10;
+}
+.integra-inner {
+  display:grid; grid-template-columns:1fr 1fr;
+  gap:80px; align-items:start; margin-bottom:80px;
+}
+.integra-title {
+  font-size:clamp(32px,5vw,56px); font-weight:900;
+  letter-spacing:-2px; color:#fff; line-height:1;
+  margin-bottom:20px;
+  transform:scaleY(0.75); transform-origin:top left; display:inline-block;
+}
+.integra-title em { font-style:italic; font-weight:100; color:var(--t); }
+.integra-body {
+  font-size:14px; line-height:1.9; color:#3D5E5E; font-weight:300;
+  max-width:380px; margin-bottom:24px;
+}
+.integra-body strong { color:var(--ink); font-weight:600; }
+.integra-detalhe {
+  font-size:13px; line-height:1.7; color:#2A4040;
+  border-left:2px solid var(--t); padding-left:16px;
+}
+.integra-detalhe strong { color:var(--ink); font-weight:600; }
+
+.fonte-card {
+  display:flex; align-items:center; gap:16px;
+  padding:18px 20px;
+  border:1px solid rgba(0,200,215,.08);
+  border-radius:8px; background:rgba(0,200,215,.02);
+  margin-bottom:8px;
+  transition:border-color .3s, background .3s;
+}
+.fonte-card:hover { border-color:rgba(0,200,215,.18); background:rgba(0,200,215,.04); }
+.fc-icon { font-size:20px; flex-shrink:0; width:36px; text-align:center; }
+.fc-title { font-size:13px; font-weight:600; color:var(--ink); margin-bottom:3px; }
+.fc-desc { font-size:11px; color:var(--dim); line-height:1.5; }
+.fc-status {
+  margin-left:auto; flex-shrink:0;
+  font-size:9px; font-weight:700; letter-spacing:2px; text-transform:uppercase;
+  padding:4px 10px; border-radius:3px;
+  color:var(--t); border:1px solid rgba(0,200,215,.2); background:rgba(0,200,215,.06);
+  white-space:nowrap;
+}
+
+.decisao-block {
+  display:flex; align-items:center; gap:40px;
+  padding:48px 0;
+  border-top:1px solid rgba(0,200,215,.06);
+}
+.db-line { flex:1; height:1px; background:linear-gradient(90deg,transparent,rgba(0,200,215,.2),transparent); }
+.db-content { text-align:center; flex-shrink:0; max-width:420px; }
+.db-label {
+  font-size:9px; letter-spacing:4px; text-transform:uppercase; color:var(--t);
+  display:block; margin-bottom:12px;
+}
+.db-text {
+  font-size:18px; color:#3D5E5E; line-height:1.7; font-weight:300;
+}
+.db-text strong { color:var(--ink); font-weight:700; }
+
+/* ══════════════════════════════════════
    MOBILE GUARD
 ══════════════════════════════════════ */
 @media(max-width:768px){
@@ -692,6 +758,75 @@ footer a { color:var(--t); text-decoration:none; }
     <div class="mq-item">Dashboard CEO <span class="mq-dot"></span></div>
   </div>
 </div>
+
+<!-- ══ INTEGRACOES ══ -->
+<section class="integra" id="integra">
+  <div class="integra-inner">
+    <div class="integra-left reveal">
+      <div class="h-tag" style="margin-bottom:20px;">Integrações</div>
+      <h2 class="integra-title">
+        Conecta com o que<br/>você <em>já usa.</em>
+      </h2>
+      <p class="integra-body">
+        Banco de dados, planilhas, sistemas de gestão.<br/>
+        O Headstock não pede que você mude nada.<br/>
+        <strong>Só organiza o que já existe e entrega visão.</strong>
+      </p>
+      <div class="integra-detalhe">
+        Não é reflexão sobre o passado.<br/>
+        É <strong>decisão sobre o que fazer agora.</strong>
+      </div>
+    </div>
+    <div class="integra-right reveal">
+      <div class="fonte-card">
+        <div class="fc-icon">🗃</div>
+        <div>
+          <div class="fc-title">Banco de dados</div>
+          <div class="fc-desc">PostgreSQL, MySQL, exportações diretas. Seus dados ficam onde estão.</div>
+        </div>
+        <div class="fc-status">Conectado</div>
+      </div>
+      <div class="fonte-card">
+        <div class="fc-icon">📊</div>
+        <div>
+          <div class="fc-title">Planilhas e relatórios</div>
+          <div class="fc-desc">Excel, .xlsx, .xls, .csv. Arrasta, processa, pronto.</div>
+        </div>
+        <div class="fc-status">Conectado</div>
+      </div>
+      <div class="fonte-card">
+        <div class="fc-icon">🔗</div>
+        <div>
+          <div class="fc-title">Sistemas de gestão</div>
+          <div class="fc-desc">Operand, TOTVS e outros via exportação padrão.</div>
+        </div>
+        <div class="fc-status">Conectado</div>
+      </div>
+      <div class="fonte-card" style="border-color:rgba(203,255,77,.15);background:rgba(203,255,77,.03);">
+        <div class="fc-icon">⚡</div>
+        <div>
+          <div class="fc-title">API em tempo real</div>
+          <div class="fc-desc">Conexão direta com sistemas que têm API. Dados sempre atualizados.</div>
+        </div>
+        <div class="fc-status" style="color:var(--lime);border-color:rgba(203,255,77,.2);background:rgba(203,255,77,.08);">Em breve</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- DESTAQUE CENTRAL -->
+  <div class="decisao-block reveal">
+    <div class="db-line"></div>
+    <div class="db-content">
+      <span class="db-label">A diferença</span>
+      <p class="db-text">
+        Dado sem contexto é ruído.<br/>
+        O Headstock transforma seus números em<br/>
+        <strong>visão de onde agir, agora.</strong>
+      </p>
+    </div>
+    <div class="db-line"></div>
+  </div>
+</section>
 
 <!-- ══ PROOF ══ -->
 <section class="proof" id="proof">
