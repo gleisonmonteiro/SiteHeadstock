@@ -513,6 +513,237 @@ footer a { color:var(--t); text-decoration:none; }
 .reveal.in { opacity:1; transform:none; }
 
 /* ══════════════════════════════════════
+   WHATSAPP AUTOMATION
+══════════════════════════════════════ */
+.wpp-section {
+  padding:120px 48px;
+  border-top:1px solid rgba(0,200,215,.06);
+  position:relative; z-index:10;
+}
+.wpp-inner {
+  display:grid; grid-template-columns:1fr 1fr;
+  gap:80px; align-items:center;
+}
+.wpp-title {
+  font-size:clamp(32px,5vw,56px); font-weight:900;
+  letter-spacing:-2px; color:#fff; line-height:1;
+  margin-bottom:20px;
+  transform:scaleY(0.75); transform-origin:top left; display:inline-block;
+}
+.wpp-title em { font-style:italic; font-weight:100; color:var(--t); }
+.wpp-body {
+  font-size:14px; line-height:1.9; color:#3D5E5E;
+  font-weight:300; margin-bottom:28px;
+}
+.wpp-body strong { color:var(--ink); font-weight:600; }
+.wpp-list {
+  list-style:none; display:flex; flex-direction:column; gap:10px;
+}
+.wpp-list li {
+  display:flex; align-items:center; gap:10px;
+  font-size:12px; color:#3D5E5E;
+}
+.wpl-dot {
+  width:6px; height:6px; border-radius:50%;
+  background:var(--t); flex-shrink:0;
+}
+
+/* SCENE */
+.wpp-scene {
+  position:relative; display:flex;
+  align-items:center; justify-content:center;
+  gap:32px; padding:40px 0;
+}
+
+/* ROBOT */
+.robot {
+  position:relative; display:flex;
+  flex-direction:column; align-items:center;
+  gap:0; animation:robot-bob 3s ease-in-out infinite;
+}
+@keyframes robot-bob {
+  0%,100%{transform:translateY(0);}
+  50%{transform:translateY(-8px);}
+}
+.robot-head {
+  width:52px; height:44px;
+  background:linear-gradient(145deg,#0F2828,#0A1A1A);
+  border:1px solid rgba(0,200,215,.3);
+  border-radius:10px 10px 6px 6px;
+  display:flex; align-items:center; justify-content:center;
+  gap:8px; flex-direction:column; padding:8px;
+  position:relative;
+  box-shadow:0 0 20px rgba(0,200,215,.1);
+}
+.robot-eye {
+  width:10px; height:10px; border-radius:50%;
+  background:var(--t);
+  box-shadow:0 0 8px var(--t);
+  animation:eye-blink 4s ease-in-out infinite;
+  position:absolute; top:10px;
+}
+.robot-eye.left{left:10px;}
+.robot-eye.right{right:10px;}
+@keyframes eye-blink {
+  0%,90%,100%{transform:scaleY(1);}
+  95%{transform:scaleY(.1);}
+}
+.robot-mouth {
+  width:20px; height:3px; border-radius:2px;
+  background:rgba(0,200,215,.4);
+  margin-top:14px;
+  animation:mouth-talk 1.5s ease-in-out infinite;
+}
+@keyframes mouth-talk {
+  0%,100%{width:20px;background:rgba(0,200,215,.4);}
+  50%{width:28px;background:var(--t);}
+}
+.robot-body {
+  width:60px; height:50px;
+  background:linear-gradient(145deg,#0F2828,#0A1A1A);
+  border:1px solid rgba(0,200,215,.2);
+  border-radius:6px;
+  display:flex; align-items:center; justify-content:center;
+  box-shadow:0 0 20px rgba(0,200,215,.08);
+}
+.robot-screen {
+  width:36px; display:flex; flex-direction:column; gap:4px;
+}
+.rs-line {
+  height:2px; border-radius:1px;
+  background:linear-gradient(90deg,var(--t),transparent);
+  animation:rs-scan 2s ease-in-out infinite;
+}
+.rs-line.short{width:60%;}
+@keyframes rs-scan {
+  0%,100%{opacity:.4;}
+  50%{opacity:1;}
+}
+.robot-arm {
+  position:absolute; top:52px;
+  width:8px; height:30px;
+  background:linear-gradient(180deg,#0F2828,#0A1A1A);
+  border:1px solid rgba(0,200,215,.2);
+  border-radius:4px;
+}
+.robot-arm.left-arm{left:-6px;transform-origin:top center;animation:arm-wave-l 2s ease-in-out infinite;}
+.robot-arm.right-arm{right:-6px;transform-origin:top center;animation:arm-wave-r 2s ease-in-out infinite;}
+@keyframes arm-wave-l{0%,100%{transform:rotate(-10deg);}50%{transform:rotate(-30deg);}}
+@keyframes arm-wave-r{0%,100%{transform:rotate(10deg);}50%{transform:rotate(30deg);}}
+.robot-hand {
+  width:10px;height:8px;
+  background:#0F2828;border:1px solid rgba(0,200,215,.2);
+  border-radius:3px; position:absolute; bottom:-8px; left:-1px;
+}
+
+/* SIGNAL WAVES */
+.signal {
+  position:absolute; border-radius:50%;
+  border:1px solid rgba(0,200,215,.4);
+  animation:signal-out 2s ease-out infinite;
+  pointer-events:none;
+}
+.s1{width:60px;height:60px;top:10px;left:50%;transform:translateX(-50%);animation-delay:0s;}
+.s2{width:90px;height:90px;top:-5px;left:50%;transform:translateX(-50%);animation-delay:.5s;}
+.s3{width:120px;height:120px;top:-20px;left:50%;transform:translateX(-50%);animation-delay:1s;}
+@keyframes signal-out {
+  0%{opacity:.6;transform:translateX(-50%) scale(.5);}
+  100%{opacity:0;transform:translateX(-50%) scale(1);}
+}
+
+/* PHONE */
+.phone {
+  width:180px;
+  background:#111;
+  border-radius:24px;
+  border:2px solid #222;
+  overflow:hidden;
+  box-shadow:
+    0 0 0 1px #333,
+    0 40px 80px rgba(0,0,0,.8),
+    0 0 40px rgba(37,211,102,.06);
+  position:relative;
+}
+.phone-notch {
+  width:60px; height:6px;
+  background:#1a1a1a; border-radius:0 0 6px 6px;
+  margin:0 auto;
+}
+.wpp-header {
+  background:#075E54;
+  padding:8px 10px;
+  display:flex; align-items:center; gap:8px;
+}
+.wpp-avatar {
+  width:28px; height:28px; border-radius:50%;
+  background:#25D366;
+  font-size:9px; font-weight:900; color:#000;
+  display:flex; align-items:center; justify-content:center;
+  flex-shrink:0;
+}
+.wpp-contact{font-size:10px;font-weight:700;color:#fff;}
+.wpp-online{font-size:8px;color:#a0e0b0;}
+
+.wpp-chat {
+  background:#0B1F1A;
+  padding:10px 8px;
+  display:flex; flex-direction:column; gap:6px;
+  min-height:220px;
+}
+
+.bubble {
+  background:#1F2C34;
+  border-radius:6px 6px 6px 0;
+  padding:7px 10px;
+  font-size:9px; color:#E0E0E0;
+  max-width:90%;
+  line-height:1.5;
+  position:relative;
+  opacity:0; transform:translateY(10px);
+}
+.bubble strong{color:#fff;}
+.b-meta{display:block;font-size:8px;color:#7A9A8A;margin-top:2px;}
+.b-time{
+  display:block; text-align:right;
+  font-size:7px; color:#4A7060; margin-top:3px;
+}
+.b-icon{font-size:11px;}
+
+.anim1{animation:bubble-in .4s .6s forwards;}
+.anim2{animation:bubble-in .4s 2s forwards;}
+.anim3{animation:bubble-in .4s 3.4s forwards;}
+.anim4{animation:bubble-in .4s 4.8s forwards;}
+@keyframes bubble-in {
+  from{opacity:0;transform:translateY(10px);}
+  to{opacity:1;transform:translateY(0);}
+}
+
+.typing {
+  display:flex; align-items:center; gap:3px;
+  padding:8px 10px;
+  background:#1F2C34;
+  border-radius:6px 6px 6px 0;
+  width:44px;
+  opacity:0;
+  animation:bubble-in .3s 6s forwards;
+}
+.typing span {
+  width:5px; height:5px; border-radius:50%;
+  background:#7A9A8A;
+  animation:typing-dot 1.2s ease-in-out infinite;
+}
+.typing span:nth-child(2){animation-delay:.2s;}
+.typing span:nth-child(3){animation-delay:.4s;}
+@keyframes typing-dot {
+  0%,60%,100%{transform:translateY(0);opacity:.4;}
+  30%{transform:translateY(-4px);opacity:1;}
+}
+.anim5{animation:bubble-in .3s 6s forwards, typing-loop 3s 6.5s infinite;}
+@keyframes typing-loop{
+  0%{opacity:1;}49%{opacity:1;}50%{opacity:0;}99%{opacity:0;}100%{opacity:1;}
+}
+
+/* ══════════════════════════════════════
    INTEGRACOES
 ══════════════════════════════════════ */
 .integra {
@@ -900,6 +1131,100 @@ footer a { color:var(--t); text-decoration:none; }
     <div class="m-sub">pode parar de exportar pra excel</div>
   </div>
 </div>
+
+<!-- ══ WHATSAPP AUTOMATION ══ -->
+<section class="wpp-section">
+  <div class="wpp-inner">
+
+    <div class="wpp-left reveal">
+      <div class="h-tag" style="margin-bottom:20px;">Automação</div>
+      <h2 class="wpp-title">
+        Seu time recebe.<br/>Você <em>já decidiu.</em>
+      </h2>
+      <p class="wpp-body">
+        O Headstock envia automaticamente alertas, relatórios e indicadores
+        direto no WhatsApp da equipe e dos CEOs.<br/><br/>
+        <strong>Sem abrir o sistema. Sem perguntar pro time. A informação chega.</strong>
+      </p>
+      <ul class="wpp-list">
+        <li><span class="wpl-dot"></span>Alertas de projeto em risco</li>
+        <li><span class="wpl-dot"></span>Resumo semanal de horas e ocupação</li>
+        <li><span class="wpl-dot"></span>Indicadores de campanha no fechamento</li>
+        <li><span class="wpl-dot"></span>Avisos de contrato próximo do limite</li>
+        <li><span class="wpl-dot"></span>Relatório executivo toda segunda-feira</li>
+      </ul>
+    </div>
+
+    <div class="wpp-right reveal">
+      <div class="wpp-scene">
+
+        <!-- ROBOT -->
+        <div class="robot">
+          <div class="robot-head">
+            <div class="robot-eye left"></div>
+            <div class="robot-eye right"></div>
+            <div class="robot-mouth"></div>
+          </div>
+          <div class="robot-body">
+            <div class="robot-screen">
+              <div class="rs-line"></div>
+              <div class="rs-line short"></div>
+              <div class="rs-line"></div>
+            </div>
+          </div>
+          <div class="robot-arm left-arm">
+            <div class="robot-hand"></div>
+          </div>
+          <div class="robot-arm right-arm">
+            <div class="robot-hand"></div>
+          </div>
+          <!-- signal waves -->
+          <div class="signal s1"></div>
+          <div class="signal s2"></div>
+          <div class="signal s3"></div>
+        </div>
+
+        <!-- PHONE -->
+        <div class="phone">
+          <div class="phone-notch"></div>
+          <div class="wpp-header">
+            <div class="wpp-avatar">HS</div>
+            <div>
+              <div class="wpp-contact">Headstock Bot</div>
+              <div class="wpp-online">● online</div>
+            </div>
+          </div>
+          <div class="wpp-chat">
+            <div class="bubble b-out anim1">
+              <span class="b-icon">📊</span> Receita semana: <strong>R$148k</strong><br/>
+              <span class="b-meta">↑ 12% vs semana passada</span>
+              <span class="b-time">09:00</span>
+            </div>
+            <div class="bubble b-out anim2">
+              <span class="b-icon">⚠️</span> <strong>Projeto Verão</strong> em risco<br/>
+              <span class="b-meta">Sem movimentação há 3 dias</span>
+              <span class="b-time">09:00</span>
+            </div>
+            <div class="bubble b-out anim3">
+              <span class="b-icon">👥</span> Equipe Criação: <strong>88% ocupada</strong><br/>
+              <span class="b-meta">Pedro Santos no limite</span>
+              <span class="b-time">09:01</span>
+            </div>
+            <div class="bubble b-out anim4">
+              <span class="b-icon">📈</span> Google Ads ROAS: <strong>4.8×</strong><br/>
+              <span class="b-meta">Recomendação: escalar budget</span>
+              <span class="b-time">09:01</span>
+            </div>
+            <div class="typing anim5">
+              <span></span><span></span><span></span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</section>
 
 <!-- ══ HOW ══ -->
 <section class="how" id="how">
