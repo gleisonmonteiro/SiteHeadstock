@@ -92,6 +92,8 @@ Timesheet: `op|ts|{slugUsuario}|{dateISO}|{numDoc}|{slugProjeto}` — upsert ide
 | `app/services/campanhaService.ts` | Campanhas, métricas de atribuição, decisão de rota e snapshot de card |
 | `app/api/agencia/campanhas/route.ts` | GET visão executiva; POST cadastro, métricas, estratégia e cards |
 | `app/agencia/campanhas/page.tsx` | UI de Performance de Campanhas e exportação do card em PNG |
+| `app/services/gestaoEquipeService.ts` | `obterGestaoEquipes()` — overview de colaboradores, equipes e projetos; CRUD de colaboradores, equipes, clientes e projetos; registro manual de horas; atualização de progresso/saúde de projeto |
+| `app/api/agencia/gestao-equipes/route.ts` | GET dados consolidados de gestão; POST criação de colaborador, equipe, cliente, projeto, apontamento e atualização de projeto |
 
 ### Varejo (Raphael/Zac)
 | Arquivo | Responsabilidade |
@@ -112,14 +114,22 @@ Timesheet: `op|ts|{slugUsuario}|{dateISO}|{numDoc}|{slugProjeto}` — upsert ide
 | Arquivo | Responsabilidade |
 |---------|-----------------|
 | `app/lib/session.ts` | `exigirUsuarioSessao()` — lança erro se não autenticado |
+| `app/lib/access.ts` | `exigirAcessoDecisao()` / `exigirAcessoImportacao()` — guards de papel; `podeVerDadosDecisao()` / `podeImportarDados()` para checks não-bloqueantes |
 | `app/lib/prisma.ts` | Singleton do Prisma |
 | `app/components/Sidebar.tsx` | Navegação — itens variam por `empresa.tipo` |
+| `app/components/bi/BIKit.tsx` | Primitivos de UI reutilizáveis para dashboards BI (`BISection`, etc.) |
+| `app/components/bi/EstoqueDashboard.tsx` | Dashboard de estoque — componente reutilizável entre clientes |
 
 ---
 
 ## Controle de acesso
 
 `exigirUsuarioSessao(request)` — chame no início de toda rota de API. Retorna `{ empresaId, empresa: { tipo }, nome, papel, ... }`.
+
+Para guards de papel, use `app/lib/access.ts`:
+- `exigirAcessoDecisao(papel)` — lança `ACESSO_RESTRITO` se não for MASTER, AGENCY_CEO ou COMPANY_OWNER.
+- `exigirAcessoImportacao(papel)` — lança `ACESSO_RESTRITO` se não tiver permissão de importação.
+- `podeVerDadosDecisao(papel)` / `podeImportarDados(papel)` — checks booleanos sem lançar erro.
 
 Filtrar todas as queries por `empresaId` / `agenciaId`. Exceção: MASTER_PLATFORM não precisa de filtro.
 
