@@ -39,10 +39,22 @@ body {
 #cv { position:fixed; inset:0; z-index:0; pointer-events:none; }
 
 /* ─── WATERMARK ─── */
-#wm { position:fixed; inset:0; z-index:1; pointer-events:none;
-      display:flex; align-items:center; justify-content:center; overflow:hidden; }
-#wm svg { width:min(85vw,860px); opacity:.018; animation:wmspin 90s linear infinite; }
-@keyframes wmspin { to { transform:rotate(360deg); } }
+#wm {
+  position:fixed; inset:0; z-index:1; pointer-events:none;
+  display:flex; align-items:center; justify-content:center; overflow:hidden;
+  perspective:1600px;
+}
+#wm img {
+  width:min(88vw,1000px);
+  opacity:.055;
+  filter:brightness(0) invert(1);
+  transform:
+    rotateX(calc(var(--my,0) * -14deg))
+    rotateY(calc(var(--mx,0) * 14deg))
+    scale(1.08);
+  transition:transform .14s linear;
+  will-change:transform;
+}
 
 /* ─── SCANLINES ─── */
 body::after {
@@ -877,15 +889,7 @@ footer a { color:var(--t); text-decoration:none; }
 
 <!-- WATERMARK -->
 <div id="wm">
-  <svg viewBox="0 0 400 400" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <circle cx="200" cy="200" r="150" stroke="#00C8D7" stroke-width="1" stroke-dasharray="8 12"/>
-    <circle cx="200" cy="200" r="100" stroke="#00C8D7" stroke-width="2"/>
-    <circle cx="200" cy="200" r="50" stroke="#00C8D7" stroke-width="1" stroke-dasharray="4 8"/>
-    <path d="M 80 200 L 140 140 L 200 200 L 140 260 Z" stroke="#00C8D7" stroke-width="3" fill="none"/>
-    <path d="M 200 200 L 260 140 L 320 200 L 260 260 Z" stroke="#00C8D7" stroke-width="3" fill="none"/>
-    <path d="M 200 80 L 200 320 M 80 200 L 320 200" stroke="#00C8D7" stroke-width=".5" opacity=".4"/>
-    <text x="200" y="208" text-anchor="middle" font-family="Inter,sans-serif" font-weight="900" font-size="24" fill="#00C8D7" letter-spacing="8">HSK</text>
-  </svg>
+  <img src="/logo-branca.png" alt="" draggable="false"/>
 </div>
 
 <div id="sp"></div>
