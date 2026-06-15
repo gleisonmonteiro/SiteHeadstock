@@ -12,6 +12,7 @@ export async function POST(request: NextRequest) {
 
     const formData = await request.formData();
     const arquivo = formData.get("arquivo") as File;
+    const programacaoId = String(formData.get("programacaoId") ?? "").trim() || undefined;
 
     if (!arquivo) {
       return NextResponse.json({ erro: "Arquivo é obrigatório" }, { status: 400 });
@@ -21,7 +22,12 @@ export async function POST(request: NextRequest) {
     }
 
     const buffer = await arquivo.arrayBuffer();
-    const resultado = await importarProducaoExcel(usuario.empresaId, buffer, usuario.id);
+    const resultado = await importarProducaoExcel(
+      usuario.empresaId,
+      buffer,
+      usuario.id,
+      programacaoId,
+    );
 
     return NextResponse.json({ sucesso: true, ...resultado });
   } catch (erro) {

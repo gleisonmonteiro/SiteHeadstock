@@ -1,5 +1,6 @@
 import * as XLSX from "xlsx";
 import { prisma } from "@/lib/prisma";
+import { criarOP } from "@/services/producaoService";
 
 function excelParaData(serial: number): Date {
   return new Date(Math.round((serial - 25569) * 86400 * 1000));
@@ -7,6 +8,17 @@ function excelParaData(serial: number): Date {
 
 function ehSerialExcel(val: unknown): val is number {
   return typeof val === "number" && val > 40000 && val < 60000;
+}
+
+function converterData(valor: unknown): Date | null {
+  if (ehSerialExcel(valor)) return excelParaData(valor);
+  if (!valor) return null;
+  const texto = String(valor).trim();
+  const br = texto.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  const data = br
+    ? new Date(Number(br[3]), Number(br[2]) - 1, Number(br[1]))
+    : new Date(texto);
+  return Number.isNaN(data.getTime()) ? null : data;
 }
 
 interface LinhaProducao {
@@ -83,6 +95,17 @@ async function obterOuCriarProgramacaoPadrao(empresaId: string): Promise<{ progr
   });
 
   if (!programacao) {
+    const primeiraExistente = await prisma.programacaoOP.findFirst({
+      where: { empresaId, ativo: true },
+      include: { etapas: { orderBy: { ordem: "asc" } } },
+      orderBy: { createdAt: "asc" },
+    });
+    if (primeiraExistente) {
+      return {
+        programacaoId: primeiraExistente.id,
+        etapas: primeiraExistente.etapas,
+      };
+    }
     programacao = await prisma.programacaoOP.create({
       data: {
         empresaId,
@@ -102,11 +125,67 @@ async function obterOuCriarProgramacaoPadrao(empresaId: string): Promise<{ progr
 export async function importarProducaoExcel(
   empresaId: string,
   buffer: ArrayBuffer,
-  usuarioId: string
+  usuarioId: string,
+  programacaoSelecionadaId?: string,
 ): Promise<{ importadas: number; atualizadas: number; erros: number }> {
   const workbook = XLSX.read(buffer, { type: "buffer" });
   const ws = workbook.Sheets[workbook.SheetNames[0]];
   const linhas = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws);
+
+  const formatoSimples = linhas.some(
+    (linha) => "OP" in linha && ("Descrição" in linha || "Descricao" in linha),
+  );
+  if (formatoSimples) {
+    const programacao =
+      (programacaoSelecionadaId &&
+        (await prisma.programacaoOP.findFirst({
+          where: { id: programacaoSelecionadaId, empresaId, ativo: true },
+        }))) ||
+      (await prisma.programacaoOP.findFirst({
+        where: { empresaId, ativo: true },
+        orderBy: { createdAt: "asc" },
+      }));
+    if (!programacao) throw new Error("Crie uma programação antes de importar as OPs");
+
+    let importadas = 0;
+    let atualizadas = 0;
+    let erros = 0;
+    for (const linha of linhas) {
+      try {
+        const numero = String(linha.OP ?? "").trim();
+        const descricao = String(linha["Descrição"] ?? linha.Descricao ?? "").trim();
+        const quantidade = Number(linha.Quantidade ?? 0);
+        const dataEnvio = converterData(linha["Data de Envio"]);
+        const dataRetorno = converterData(
+          linha["Data de Retorno"] ?? linha["Data de Retormo"],
+        );
+        if (!numero || !descricao || quantidade <= 0 || !dataEnvio) {
+          erros++;
+          continue;
+        }
+        const existente = await prisma.ordemProducao.findUnique({
+          where: { empresaId_numero: { empresaId, numero } },
+        });
+        if (existente) {
+          atualizadas++;
+          continue;
+        }
+        await criarOP(empresaId, usuarioId, {
+          numero,
+          referencia: String(linha.Referencia ?? linha["Referência"] ?? "").trim(),
+          descricao,
+          quantidade,
+          programacaoId: programacao.id,
+          dataEnvio,
+          dataRetornoPrevista: dataRetorno,
+        });
+        importadas++;
+      } catch {
+        erros++;
+      }
+    }
+    return { importadas, atualizadas, erros };
+  }
 
   // Agrupar por documento
   const porDocumento = new Map<string, { cabecalho: LinhaProducao; itens: LinhaProducao[] }>();
@@ -121,9 +200,17 @@ export async function importarProducaoExcel(
     porDocumento.get(linha.documento)!.itens.push(linha);
   }
 
-  const { programacaoId, etapas } = await obterOuCriarProgramacaoPadrao(empresaId);
-  const etapaCostExt = etapas.find((e) => e.nome === "COST. EXT.");
-  if (!etapaCostExt) throw new Error("Etapa COST. EXT. não encontrada na programação padrão");
+  const selecionada = programacaoSelecionadaId
+    ? await prisma.programacaoOP.findFirst({
+        where: { id: programacaoSelecionadaId, empresaId, ativo: true },
+        include: { etapas: { orderBy: { ordem: "asc" } } },
+      })
+    : null;
+  const { programacaoId, etapas } = selecionada
+    ? { programacaoId: selecionada.id, etapas: selecionada.etapas }
+    : await obterOuCriarProgramacaoPadrao(empresaId);
+  const etapaCostExt = etapas.find((e) => e.nome === "COST. EXT.") ?? etapas[0];
+  if (!etapaCostExt) throw new Error("A programação selecionada não possui etapas");
 
   let importadas = 0;
   let atualizadas = 0;
@@ -156,6 +243,8 @@ export async function importarProducaoExcel(
           custoTotal,
           status: "EM_ANDAMENTO",
           etapaAtualId: etapaCostExt.id,
+          dataEnvio: cabecalho.dataSaida,
+          dataRetornoPrevista: cabecalho.dataPrevisaoRetorno,
           criadoPorId: usuarioId,
           itens: {
             create: itens.map((i) => ({
@@ -169,6 +258,9 @@ export async function importarProducaoExcel(
           movimentacoes: {
             create: {
               etapaId: etapaCostExt.id,
+              tipo: "ENTRADA",
+              quantidade: qtdTotal,
+              localDestino: cabecalho.oficina || null,
               dataEntrada: cabecalho.dataSaida,
               dataPrevisaoRetorno: cabecalho.dataPrevisaoRetorno,
               usuarioId,

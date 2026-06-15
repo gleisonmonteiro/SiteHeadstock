@@ -130,6 +130,7 @@ model Usuario {
   atualizacoesProjeto   AtualizacaoProjeto[]
   ordensProducaoCriadas OrdemProducao[]       @relation("CriadorOP")
   movimentacoesOP       MovimentacaoOP[]
+  estornosMovimentacao  MovimentacaoOP[]      @relation("UsuarioEstornoMovimentacao")
 
   @@unique([email])
   @@map("usuarios")
@@ -673,9 +674,11 @@ model EtapaProgramacao {
   nome          String
   ordem         Int
   descricao     String?
+  externa       Boolean       @default(false)
   createdAt     DateTime      @default(now())
 
-  movimentacoes MovimentacaoOP[]
+  movimentacoesDestino MovimentacaoOP[] @relation("EtapaDestinoMovimentacao")
+  movimentacoesOrigem  MovimentacaoOP[] @relation("EtapaOrigemMovimentacao")
 
   @@unique([programacaoId, ordem])
   @@index([programacaoId])
@@ -683,24 +686,26 @@ model EtapaProgramacao {
 }
 
 model OrdemProducao {
-  id            String        @id @default(cuid())
-  empresaId     String
-  empresa       Empresa       @relation(fields: [empresaId], references: [id], onDelete: Cascade)
-  programacaoId String
-  programacao   ProgramacaoOP @relation(fields: [programacaoId], references: [id])
-  numero        String
-  referencia    String?
-  produto       String
-  genero        String?
-  oficina       String?
-  qtdTotal      Int           @default(0)
-  custoTotal    Float         @default(0)
-  status        StatusOP      @default(EM_ANDAMENTO)
-  etapaAtualId  String?
-  criadoPorId   String?
-  criadoPor     Usuario?      @relation("CriadorOP", fields: [criadoPorId], references: [id], onDelete: SetNull)
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
+  id                  String        @id @default(cuid())
+  empresaId           String
+  empresa             Empresa       @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  programacaoId       String
+  programacao         ProgramacaoOP @relation(fields: [programacaoId], references: [id])
+  numero              String
+  referencia          String?
+  produto             String
+  genero              String?
+  oficina             String?
+  qtdTotal            Int           @default(0)
+  custoTotal          Float         @default(0)
+  status              StatusOP      @default(EM_ANDAMENTO)
+  etapaAtualId        String?
+  dataEnvio           DateTime?     @db.Date
+  dataRetornoPrevista DateTime?     @db.Date
+  criadoPorId         String?
+  criadoPor           Usuario?      @relation("CriadorOP", fields: [criadoPorId], references: [id], onDelete: SetNull)
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
 
   itens         ItemOP[]
   movimentacoes MovimentacaoOP[]
@@ -726,21 +731,34 @@ model ItemOP {
 }
 
 model MovimentacaoOP {
-  id                  String           @id @default(cuid())
+  id                  String            @id @default(cuid())
   opId                String
-  op                  OrdemProducao    @relation(fields: [opId], references: [id], onDelete: Cascade)
-  etapaId             String
-  etapa               EtapaProgramacao @relation(fields: [etapaId], references: [id])
+  op                  OrdemProducao     @relation(fields: [opId], references: [id], onDelete: Cascade)
+  etapaOrigemId       String?
+  etapaOrigem         EtapaProgramacao? @relation("EtapaOrigemMovimentacao", fields: [etapaOrigemId], references: [id])
+  etapaId             String?
+  etapa               EtapaProgramacao? @relation("EtapaDestinoMovimentacao", fields: [etapaId], references: [id])
+  tipo                String            @default("MOVIMENTO")
+  quantidade          Int               @default(0)
+  quantidadeDefeito   Int               @default(0)
+  localOrigem         String?
+  localDestino        String?
   dataEntrada         DateTime
   dataSaida           DateTime?
   dataPrevisaoRetorno DateTime?
   usuarioId           String?
-  usuario             Usuario?         @relation(fields: [usuarioId], references: [id], onDelete: SetNull)
+  usuario             Usuario?          @relation(fields: [usuarioId], references: [id], onDelete: SetNull)
   observacao          String?
-  createdAt           DateTime         @default(now())
+  estornadaEm         DateTime?
+  estornadaPorId      String?
+  estornadaPor        Usuario?          @relation("UsuarioEstornoMovimentacao", fields: [estornadaPorId], references: [id], onDelete: SetNull)
+  motivoEstorno       String?
+  createdAt           DateTime          @default(now())
 
   @@index([opId])
   @@index([etapaId])
+  @@index([etapaOrigemId])
+  @@index([estornadaPorId])
   @@map("movimentacoes_op")
 }
 

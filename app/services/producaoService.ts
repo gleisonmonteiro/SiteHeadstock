@@ -1,166 +1,411 @@
 import { prisma } from "@/lib/prisma";
 
+type EtapaInput = {
+  nome: string;
+  ordem: number;
+  descricao?: string;
+  externa?: boolean;
+};
+
+type CriarOPInput = {
+  numero: string;
+  referencia?: string;
+  descricao: string;
+  quantidade: number;
+  programacaoId: string;
+  dataEnvio: Date;
+  dataRetornoPrevista?: Date | null;
+  localInicial?: string;
+};
+
+type MovimentarOPInput = {
+  etapaOrigemId: string;
+  localOrigem?: string | null;
+  etapaDestinoId?: string | null;
+  localDestino?: string | null;
+  quantidade: number;
+  quantidadeDefeito?: number;
+  dataPrevisaoRetorno?: Date | null;
+  observacao?: string;
+  concluir?: boolean;
+};
+
+const includeOP = {
+  programacao: { include: { etapas: { orderBy: { ordem: "asc" as const } } } },
+  itens: { orderBy: [{ cor: "asc" as const }, { tamanho: "asc" as const }] },
+  movimentacoes: {
+    include: {
+      etapa: true,
+      etapaOrigem: true,
+      usuario: { select: { nome: true } },
+      estornadaPor: { select: { nome: true } },
+    },
+    orderBy: [{ dataEntrada: "asc" as const }, { createdAt: "asc" as const }],
+  },
+};
+
+function chaveSaldo(etapaId: string, local: string | null | undefined) {
+  return `${etapaId}::${(local ?? "").trim().toLocaleLowerCase("pt-BR")}`;
+}
+
+function diasEntre(inicio: Date, fim = new Date()) {
+  return Math.max(0, Math.floor((fim.getTime() - inicio.getTime()) / 86_400_000));
+}
+
+function calcularSaldos(op: Awaited<ReturnType<typeof buscarOPCompleta>>) {
+  if (!op) return { saldos: [], quantidadeConcluida: 0, quantidadeDefeitos: 0 };
+
+  const saldos = new Map<
+    string,
+    {
+      etapaId: string;
+      etapaNome: string;
+      etapaOrdem: number;
+      etapaExterna: boolean;
+      local: string | null;
+      quantidade: number;
+      dataEntrada: Date;
+      dataPrevisaoRetorno: Date | null;
+      movimentoId: string;
+    }
+  >();
+  let quantidadeConcluida = 0;
+  let quantidadeDefeitos = 0;
+
+  for (const movimento of op.movimentacoes) {
+    if (movimento.estornadaEm) continue;
+    const quantidade = movimento.quantidade > 0 ? movimento.quantidade : op.qtdTotal;
+    quantidadeDefeitos += movimento.quantidadeDefeito;
+
+    if (movimento.etapaOrigemId) {
+      const origemKey = chaveSaldo(movimento.etapaOrigemId, movimento.localOrigem);
+      const origem = saldos.get(origemKey);
+      if (origem) origem.quantidade -= quantidade;
+    }
+
+    if (movimento.tipo === "CONCLUSAO") {
+      quantidadeConcluida += quantidade;
+      continue;
+    }
+
+    if (movimento.etapaId && movimento.etapa) {
+      const destinoKey = chaveSaldo(movimento.etapaId, movimento.localDestino);
+      const destino = saldos.get(destinoKey) ?? {
+        etapaId: movimento.etapaId,
+        etapaNome: movimento.etapa.nome,
+        etapaOrdem: movimento.etapa.ordem,
+        etapaExterna: movimento.etapa.externa,
+        local: movimento.localDestino,
+        quantidade: 0,
+        dataEntrada: movimento.dataEntrada,
+        dataPrevisaoRetorno: movimento.dataPrevisaoRetorno,
+        movimentoId: movimento.id,
+      };
+      destino.quantidade += quantidade;
+      destino.dataEntrada = movimento.dataEntrada;
+      destino.dataPrevisaoRetorno =
+        movimento.dataPrevisaoRetorno ?? op.dataRetornoPrevista;
+      destino.movimentoId = movimento.id;
+      saldos.set(destinoKey, destino);
+    }
+  }
+
+  return {
+    saldos: [...saldos.values()]
+      .filter((saldo) => saldo.quantidade > 0)
+      .map((saldo) => {
+        const hoje = new Date();
+        const atraso =
+          saldo.dataPrevisaoRetorno && saldo.dataPrevisaoRetorno.getTime() < hoje.getTime()
+            ? diasEntre(saldo.dataPrevisaoRetorno, hoje)
+            : 0;
+        return {
+          ...saldo,
+          diasNaEtapa: diasEntre(saldo.dataEntrada, hoje),
+          diasAtraso: atraso,
+          atrasada: atraso > 0,
+        };
+      })
+      .sort((a, b) => a.etapaOrdem - b.etapaOrdem || b.quantidade - a.quantidade),
+    quantidadeConcluida,
+    quantidadeDefeitos,
+  };
+}
+
+async function buscarOPCompleta(empresaId: string, opId: string) {
+  return prisma.ordemProducao.findFirst({
+    where: { id: opId, empresaId },
+    include: includeOP,
+  });
+}
+
+function enriquecerOP(op: NonNullable<Awaited<ReturnType<typeof buscarOPCompleta>>>) {
+  const resumo = calcularSaldos(op);
+  const maiorAtraso = Math.max(0, ...resumo.saldos.map((saldo) => saldo.diasAtraso));
+  return {
+    ...op,
+    ...resumo,
+    atrasada: maiorAtraso > 0,
+    diasAtraso: maiorAtraso,
+    ultimaMovimentacao: [...op.movimentacoes]
+      .reverse()
+      .find((movimento) => !movimento.estornadaEm) ?? null,
+  };
+}
+
+async function sincronizarEstadoOP(empresaId: string, opId: string) {
+  const op = await buscarOPCompleta(empresaId, opId);
+  if (!op) throw new Error("OP_NAO_ENCONTRADA");
+  const { saldos, quantidadeConcluida } = calcularSaldos(op);
+  const etapasAtivas = [...new Set(saldos.map((saldo) => saldo.etapaId))];
+  const status =
+    quantidadeConcluida >= op.qtdTotal
+      ? "CONCLUIDA"
+      : op.movimentacoes.some((movimento) => !movimento.estornadaEm)
+        ? "EM_ANDAMENTO"
+        : "AGUARDANDO";
+
+  await prisma.ordemProducao.update({
+    where: { id: opId },
+    data: {
+      status,
+      etapaAtualId: etapasAtivas.length === 1 ? etapasAtivas[0] : null,
+    },
+  });
+}
+
 export async function listarProgramacoes(empresaId: string) {
   return prisma.programacaoOP.findMany({
     where: { empresaId },
-    include: { etapas: { orderBy: { ordem: "asc" } } },
+    include: {
+      etapas: { orderBy: { ordem: "asc" } },
+      _count: { select: { ordens: true } },
+    },
     orderBy: { createdAt: "asc" },
   });
 }
 
-export async function criarProgramacao(empresaId: string, nome: string, etapas: { nome: string; ordem: number; descricao?: string }[]) {
+export async function criarProgramacao(
+  empresaId: string,
+  nome: string,
+  etapas: EtapaInput[],
+) {
+  const total = await prisma.programacaoOP.count({ where: { empresaId } });
+  if (total >= 5) throw new Error("LIMITE_PROGRAMACOES");
+
+  const nomeLimpo = nome.trim();
+  const etapasLimpas = etapas
+    .map((etapa, index) => ({
+      nome: etapa.nome.trim(),
+      ordem: index + 1,
+      descricao: etapa.descricao?.trim() || null,
+      externa: Boolean(etapa.externa),
+    }))
+    .filter((etapa) => etapa.nome);
+
+  if (!nomeLimpo || etapasLimpas.length < 2) throw new Error("PROGRAMACAO_INVALIDA");
+  if (new Set(etapasLimpas.map((etapa) => etapa.nome.toLowerCase())).size !== etapasLimpas.length) {
+    throw new Error("ETAPAS_DUPLICADAS");
+  }
+
   return prisma.programacaoOP.create({
     data: {
       empresaId,
-      nome,
-      etapas: { create: etapas },
+      nome: nomeLimpo,
+      etapas: { create: etapasLimpas },
     },
     include: { etapas: { orderBy: { ordem: "asc" } } },
   });
 }
 
 export async function listarOPs(empresaId: string, status?: string) {
-  return prisma.ordemProducao.findMany({
+  const ops = await prisma.ordemProducao.findMany({
     where: {
       empresaId,
-      ...(status ? { status: status as "AGUARDANDO" | "EM_ANDAMENTO" | "CONCLUIDA" | "CANCELADA" } : {}),
+      ...(status
+        ? {
+            status: status as
+              | "AGUARDANDO"
+              | "EM_ANDAMENTO"
+              | "CONCLUIDA"
+              | "CANCELADA",
+          }
+        : {}),
     },
-    include: {
-      programacao: { include: { etapas: { orderBy: { ordem: "asc" } } } },
-      itens: { orderBy: [{ cor: "asc" }, { tamanho: "asc" }] },
-      movimentacoes: {
-        include: { etapa: true },
-        orderBy: { dataEntrada: "asc" },
-      },
-    },
+    include: includeOP,
     orderBy: { createdAt: "desc" },
   });
+  return ops.map(enriquecerOP);
 }
 
 export async function obterOPDetalhe(empresaId: string, opId: string) {
-  return prisma.ordemProducao.findFirst({
-    where: { id: opId, empresaId },
-    include: {
-      programacao: { include: { etapas: { orderBy: { ordem: "asc" } } } },
-      itens: { orderBy: { cor: "asc" } },
+  const op = await buscarOPCompleta(empresaId, opId);
+  return op ? enriquecerOP(op) : null;
+}
+
+export async function criarOP(
+  empresaId: string,
+  usuarioId: string,
+  dados: CriarOPInput,
+) {
+  const programacao = await prisma.programacaoOP.findFirst({
+    where: { id: dados.programacaoId, empresaId, ativo: true },
+    include: { etapas: { orderBy: { ordem: "asc" } } },
+  });
+  if (!programacao || programacao.etapas.length === 0) {
+    throw new Error("PROGRAMACAO_INVALIDA");
+  }
+  if (!dados.numero.trim() || !dados.descricao.trim() || dados.quantidade <= 0) {
+    throw new Error("OP_INVALIDA");
+  }
+
+  const primeiraEtapa = programacao.etapas[0];
+  const op = await prisma.ordemProducao.create({
+    data: {
+      empresaId,
+      programacaoId: programacao.id,
+      numero: dados.numero.trim(),
+      referencia: dados.referencia?.trim() || null,
+      produto: dados.descricao.trim(),
+      qtdTotal: Math.floor(dados.quantidade),
+      status: "EM_ANDAMENTO",
+      etapaAtualId: primeiraEtapa.id,
+      dataEnvio: dados.dataEnvio,
+      dataRetornoPrevista: dados.dataRetornoPrevista ?? null,
+      criadoPorId: usuarioId,
+      itens: {
+        create: {
+          quantidade: Math.floor(dados.quantidade),
+        },
+      },
       movimentacoes: {
-        include: { etapa: true, usuario: { select: { nome: true } } },
-        orderBy: { dataEntrada: "asc" },
+        create: {
+          etapaId: primeiraEtapa.id,
+          tipo: "ENTRADA",
+          quantidade: Math.floor(dados.quantidade),
+          localDestino: dados.localInicial?.trim() || null,
+          dataEntrada: dados.dataEnvio,
+          dataPrevisaoRetorno: dados.dataRetornoPrevista ?? null,
+          usuarioId,
+          observacao: "Entrada da OP na programação",
+        },
       },
     },
   });
+  return obterOPDetalhe(empresaId, op.id);
 }
 
 export async function movimentarOP(
   empresaId: string,
   opId: string,
-  proximaEtapaId: string,
   usuarioId: string,
-  observacao?: string
+  dados: MovimentarOPInput,
 ) {
-  const op = await prisma.ordemProducao.findFirst({
-    where: { id: opId, empresaId },
-    include: {
-      programacao: { include: { etapas: { orderBy: { ordem: "asc" } } } },
-      movimentacoes: { orderBy: { dataEntrada: "desc" }, take: 1 },
-    },
-  });
-
-  if (!op) throw new Error("OP não encontrada");
-  if (op.status === "CONCLUIDA" || op.status === "CANCELADA") throw new Error("OP já finalizada");
-
-  const agora = new Date();
-
-  // Encerrar movimentação atual
-  const movAtual = op.movimentacoes[0];
-  if (movAtual && !movAtual.dataSaida) {
-    await prisma.movimentacaoOP.update({
-      where: { id: movAtual.id },
-      data: { dataSaida: agora },
-    });
+  const op = await buscarOPCompleta(empresaId, opId);
+  if (!op) throw new Error("OP_NAO_ENCONTRADA");
+  if (op.status === "CONCLUIDA" || op.status === "CANCELADA") {
+    throw new Error("OP_FINALIZADA");
   }
 
-  // Verificar se é a última etapa
-  const ultimaEtapa = op.programacao.etapas[op.programacao.etapas.length - 1];
-  const concluida = ultimaEtapa.id === op.etapaAtualId;
+  const { saldos } = calcularSaldos(op);
+  const origem = saldos.find(
+    (saldo) =>
+      saldo.etapaId === dados.etapaOrigemId &&
+      chaveSaldo(saldo.etapaId, saldo.local) ===
+        chaveSaldo(dados.etapaOrigemId, dados.localOrigem),
+  );
+  const quantidade = Math.floor(dados.quantidade);
+  const defeitos = Math.floor(dados.quantidadeDefeito ?? 0);
+  if (!origem || quantidade <= 0 || quantidade > origem.quantidade) {
+    throw new Error("QUANTIDADE_INVALIDA");
+  }
+  if (defeitos < 0 || defeitos > quantidade) throw new Error("DEFEITOS_INVALIDOS");
 
-  // Criar nova movimentação
+  const etapaOrigem = op.programacao.etapas.find(
+    (etapa) => etapa.id === dados.etapaOrigemId,
+  );
+  if (!etapaOrigem) throw new Error("ETAPA_INVALIDA");
+
+  let etapaDestinoId: string | null = null;
+  let tipo = "MOVIMENTO";
+  if (dados.concluir) {
+    const ultimaEtapa = op.programacao.etapas.at(-1);
+    if (ultimaEtapa?.id !== etapaOrigem.id) throw new Error("ETAPA_INVALIDA");
+    tipo = "CONCLUSAO";
+  } else {
+    const proxima = op.programacao.etapas.find(
+      (etapa) => etapa.ordem === etapaOrigem.ordem + 1,
+    );
+    if (!proxima || proxima.id !== dados.etapaDestinoId) {
+      throw new Error("ETAPA_INVALIDA");
+    }
+    etapaDestinoId = proxima.id;
+  }
+
   await prisma.movimentacaoOP.create({
     data: {
       opId,
-      etapaId: proximaEtapaId,
-      dataEntrada: agora,
+      etapaOrigemId: etapaOrigem.id,
+      etapaId: etapaDestinoId,
+      tipo,
+      quantidade,
+      quantidadeDefeito: defeitos,
+      localOrigem: dados.localOrigem?.trim() || null,
+      localDestino: dados.localDestino?.trim() || null,
+      dataEntrada: new Date(),
+      dataPrevisaoRetorno: dados.dataPrevisaoRetorno ?? op.dataRetornoPrevista,
       usuarioId,
-      observacao: observacao ?? null,
+      observacao: dados.observacao?.trim() || null,
     },
   });
 
-  // Atualizar etapa atual e status
-  return prisma.ordemProducao.update({
-    where: { id: opId },
-    data: {
-      etapaAtualId: proximaEtapaId,
-      status: concluida ? "CONCLUIDA" : "EM_ANDAMENTO",
-    },
-  });
+  await sincronizarEstadoOP(empresaId, opId);
+  return obterOPDetalhe(empresaId, opId);
 }
 
-export async function concluirOP(empresaId: string, opId: string) {
-  const op = await prisma.ordemProducao.findFirst({
-    where: { id: opId, empresaId },
-    include: { movimentacoes: { orderBy: { dataEntrada: "desc" }, take: 1 } },
+export async function estornarMovimentacao(
+  empresaId: string,
+  movimentoId: string,
+  usuarioId: string,
+  motivo: string,
+) {
+  const movimento = await prisma.movimentacaoOP.findFirst({
+    where: { id: movimentoId, op: { empresaId } },
+    include: { op: true },
   });
+  if (!movimento) throw new Error("MOVIMENTACAO_NAO_ENCONTRADA");
+  if (movimento.estornadaEm) throw new Error("MOVIMENTACAO_ESTORNADA");
 
-  if (!op) throw new Error("OP não encontrada");
-
-  const agora = new Date();
-  const movAtual = op.movimentacoes[0];
-  if (movAtual && !movAtual.dataSaida) {
-    await prisma.movimentacaoOP.update({
-      where: { id: movAtual.id },
-      data: { dataSaida: agora },
-    });
-  }
-
-  return prisma.ordemProducao.update({
-    where: { id: opId },
-    data: { status: "CONCLUIDA" },
+  const ultima = await prisma.movimentacaoOP.findFirst({
+    where: { opId: movimento.opId, estornadaEm: null },
+    orderBy: [{ dataEntrada: "desc" }, { createdAt: "desc" }],
   });
+  if (!ultima || ultima.id !== movimento.id) throw new Error("ESTORNO_FORA_DE_ORDEM");
+  if (!motivo.trim()) throw new Error("MOTIVO_OBRIGATORIO");
+
+  await prisma.movimentacaoOP.update({
+    where: { id: movimento.id },
+    data: {
+      estornadaEm: new Date(),
+      estornadaPorId: usuarioId,
+      motivoEstorno: motivo.trim(),
+    },
+  });
+  await sincronizarEstadoOP(empresaId, movimento.opId);
+  return obterOPDetalhe(empresaId, movimento.opId);
 }
 
 export async function kpisProducao(empresaId: string) {
-  const [total, porStatus, movimentacoes] = await Promise.all([
-    prisma.ordemProducao.count({ where: { empresaId } }),
-    prisma.ordemProducao.groupBy({
-      by: ["status"],
-      where: { empresaId },
-      _count: { id: true },
-    }),
-    prisma.movimentacaoOP.findMany({
-      where: { op: { empresaId }, dataSaida: { not: null } },
-      include: { etapa: true },
-      orderBy: { dataEntrada: "asc" },
-    }),
-  ]);
-
-  // Tempo médio por etapa (em horas)
-  const temposPorEtapa: Record<string, number[]> = {};
-  for (const mov of movimentacoes) {
-    if (!mov.dataSaida) continue;
-    const horas = (mov.dataSaida.getTime() - mov.dataEntrada.getTime()) / 3_600_000;
-    const nome = mov.etapa.nome;
-    if (!temposPorEtapa[nome]) temposPorEtapa[nome] = [];
-    temposPorEtapa[nome].push(horas);
-  }
-
-  const tempoMedioPorEtapa = Object.entries(temposPorEtapa).map(([etapa, tempos]) => ({
-    etapa,
-    mediaHoras: Math.round(tempos.reduce((a, b) => a + b, 0) / tempos.length),
-  }));
-
+  const ops = await listarOPs(empresaId);
+  const abertas = ops.filter((op) => !["CONCLUIDA", "CANCELADA"].includes(op.status));
   return {
-    total,
-    porStatus: Object.fromEntries(porStatus.map((s) => [s.status, s._count.id])),
-    tempoMedioPorEtapa,
+    total: ops.length,
+    emAndamento: abertas.length,
+    atrasadas: abertas.filter((op) => op.atrasada).length,
+    pecasPendentes: abertas.reduce(
+      (total, op) => total + op.saldos.reduce((soma, saldo) => soma + saldo.quantidade, 0),
+      0,
+    ),
+    defeitos: ops.reduce((total, op) => total + op.quantidadeDefeitos, 0),
   };
 }

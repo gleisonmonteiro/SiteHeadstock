@@ -90,7 +90,7 @@ export function Sidebar() {
       ? [{ label: "Equipes", href: "/agencia/equipes", icon: "equipes" }]
       : []),
     ...(isOperacionalEmpresa && isVarejo
-      ? [{ label: "Movimentação de OPs", href: "/producao/operacional", icon: "operacional" }]
+      ? [{ label: "Acompanhamento de OPs", href: "/producao/operacional", icon: "operacional" }]
       : []),
     // CEO vê tudo (exceto views exclusivas de operacional)
     ...(isCeoEmpresa && isVarejo
