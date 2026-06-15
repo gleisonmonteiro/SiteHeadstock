@@ -46,8 +46,8 @@ body {
 }
 #wm img {
   width:min(88vw,1000px);
-  opacity:.08;
-  filter:sepia(1) hue-rotate(155deg) saturate(4) brightness(1.4);
+  opacity:.22;
+  filter:sepia(1) hue-rotate(155deg) saturate(2) brightness(0.28);
   transform:
     rotateX(calc(var(--my,0) * -14deg))
     rotateY(calc(var(--mx,0) * 14deg))
@@ -887,6 +887,11 @@ footer a { color:var(--t); text-decoration:none; }
 <div id="cr"></div>
 <canvas id="cv"></canvas>
 
+
+<!-- WATERMARK -->
+<div id="wm">
+  <img src="/headstock-logo-white.png" alt="" draggable="false"/>
+</div>
 
 <div id="sp"></div>
 
