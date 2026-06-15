@@ -1433,6 +1433,31 @@ const blobs=[
   {bx:.5,by:.5,t:4,sp:.00015,c:'0,200,215'},
 ];
 
+/* ─── COMETS ─── */
+const comets=[];
+function spawnComet(){
+  const side=Math.random()<.5;
+  // entra pelo topo ou pela direita, cruza na diagonal
+  const startX=side ? Math.random()*W*1.2 : W+80;
+  const startY=side ? -80 : Math.random()*H*.5;
+  const angle=Math.PI*.22+Math.random()*.12; // ~40-50 graus
+  const speed=6+Math.random()*5;
+  comets.push({
+    x:startX, y:startY,
+    vx:-Math.cos(angle)*speed,
+    vy: Math.sin(angle)*speed,
+    len:180+Math.random()*180,
+    alpha:0, fadeIn:true,
+    life:1, r:.8+Math.random()*.8,
+    color:Math.random()<.8?'0,200,215':'203,255,77'
+  });
+}
+// primeiro cometa após 3s, depois intervalo aleatório 6-16s
+setTimeout(function next(){
+  spawnComet();
+  setTimeout(next, 6000+Math.random()*10000);
+},3000);
+
 let fr=0;
 (function draw(){
   ctx2.clearRect(0,0,W,H);
@@ -1457,6 +1482,35 @@ let fr=0;
     ctx2.beginPath();ctx2.arc(p.x,p.y,p.r,0,Math.PI*2);
     ctx2.fillStyle=`rgba(0,200,215,${al})`;ctx2.fill();
   });
+  // comets
+  for(let i=comets.length-1;i>=0;i--){
+    const cm=comets[i];
+    cm.x+=cm.vx; cm.y+=cm.vy;
+    if(cm.fadeIn){ cm.alpha=Math.min(cm.alpha+.04,1); if(cm.alpha>=1)cm.fadeIn=false; }
+    else { cm.life-=.008; cm.alpha=cm.life; }
+    if(cm.life<=0||cm.x<-200||cm.y>H+200){ comets.splice(i,1); continue; }
+    // trilha (gradient da cauda até a ponta)
+    const tx=cm.x-cm.vx/Math.hypot(cm.vx,cm.vy)*cm.len;
+    const ty=cm.y-cm.vy/Math.hypot(cm.vx,cm.vy)*cm.len;
+    const trail=ctx2.createLinearGradient(tx,ty,cm.x,cm.y);
+    trail.addColorStop(0,'transparent');
+    trail.addColorStop(1,`rgba(${cm.color},${cm.alpha*.55})`);
+    ctx2.save();
+    ctx2.lineWidth=cm.r*2;
+    ctx2.strokeStyle=trail;
+    ctx2.beginPath();ctx2.moveTo(tx,ty);ctx2.lineTo(cm.x,cm.y);ctx2.stroke();
+    // ponta brilhante
+    const glow=ctx2.createRadialGradient(cm.x,cm.y,0,cm.x,cm.y,cm.r*14);
+    glow.addColorStop(0,`rgba(${cm.color},${cm.alpha*.9})`);
+    glow.addColorStop(.3,`rgba(${cm.color},${cm.alpha*.3})`);
+    glow.addColorStop(1,'transparent');
+    ctx2.fillStyle=glow;
+    ctx2.beginPath();ctx2.arc(cm.x,cm.y,cm.r*14,0,Math.PI*2);ctx2.fill();
+    // núcleo
+    ctx2.fillStyle=`rgba(255,255,255,${cm.alpha*.95})`;
+    ctx2.beginPath();ctx2.arc(cm.x,cm.y,cm.r,0,Math.PI*2);ctx2.fill();
+    ctx2.restore();
+  }
   fr++;requestAnimationFrame(draw);
 })();
 
