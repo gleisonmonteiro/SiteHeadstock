@@ -503,6 +503,40 @@ nav {
 .cta-large:hover .cta-larr { transform:translateX(8px); }
 .final-hint { font-size:10px; color:var(--dim); letter-spacing:2px; text-transform:uppercase; }
 
+.access-modal {
+  position:fixed; inset:0; z-index:1000;
+  display:none; align-items:center; justify-content:center;
+  padding:24px; background:rgba(3,14,14,.78);
+  backdrop-filter:blur(18px);
+}
+.access-modal.is-open { display:flex; }
+.access-box {
+  width:min(460px,100%);
+  border:1px solid rgba(0,200,215,.18);
+  background:linear-gradient(180deg,rgba(10,31,31,.96),rgba(5,18,18,.96));
+  border-radius:10px; padding:28px;
+  box-shadow:0 30px 120px rgba(0,0,0,.55);
+}
+.access-kicker {
+  font-size:10px; color:var(--lime); letter-spacing:2px;
+  text-transform:uppercase; font-weight:800; margin-bottom:14px;
+}
+.access-title {
+  font-size:28px; color:#fff; font-weight:900; letter-spacing:-1px;
+  line-height:1.05; margin-bottom:14px;
+}
+.access-text { font-size:14px; color:var(--dim); line-height:1.8; margin-bottom:22px; }
+.access-actions { display:flex; gap:12px; flex-wrap:wrap; }
+.access-close {
+  border:0; border-radius:6px; padding:12px 18px;
+  background:var(--lime); color:#000; font-weight:900;
+  text-transform:uppercase; letter-spacing:1px; cursor:pointer;
+}
+.access-note {
+  display:flex; align-items:center; color:var(--dim);
+  font-size:11px; letter-spacing:1px; text-transform:uppercase;
+}
+
 /* ══════════════════════════════════════
    FOOTER
 ══════════════════════════════════════ */
@@ -902,7 +936,7 @@ footer a { color:var(--t); text-decoration:none; }
     <a href="#proof">Produto</a>
     <a href="#how">Como funciona</a>
   </div>
-  <a href="http://localhost:3000/login" class="n-enter">Entrar →</a>
+  <a href="#acesso" class="n-enter js-access">Entrar →</a>
 </nav>
 
 <!-- ══ HERO ══ -->
@@ -924,7 +958,7 @@ footer a { color:var(--t); text-decoration:none; }
     </p>
 
     <div class="h-cta-row">
-      <a href="http://localhost:3000/login" class="cta-main">
+      <a href="#acesso" class="cta-main js-access">
         Acessar o Headstock
         <span class="cta-arrow">→</span>
       </a>
@@ -1407,7 +1441,7 @@ footer a { color:var(--t); text-decoration:none; }
       </p>
     </div>
     <div class="final-right reveal">
-      <a href="http://localhost:3000/login" class="cta-large">
+      <a href="#acesso" class="cta-large js-access">
         Entrar no Headstock
         <span class="cta-larr">→</span>
       </a>
@@ -1420,10 +1454,44 @@ footer a { color:var(--t); text-decoration:none; }
 <footer>
   <span style="font-weight:900;letter-spacing:4px;color:var(--t)">HEADSTOCK</span>
   <span>Inteligência Gerencial · 2026</span>
-  <a href="http://localhost:3000/login">Acessar plataforma →</a>
+  <a href="#acesso" class="js-access">Acessar plataforma →</a>
 </footer>
 
+<div class="access-modal" id="access-modal" aria-hidden="true">
+  <div class="access-box" role="dialog" aria-modal="true" aria-labelledby="access-title">
+    <div class="access-kicker">Acesso restrito</div>
+    <div class="access-title" id="access-title">Plataforma em implantação</div>
+    <div class="access-text">
+      O Headstock ja esta em fase de construcao privada. O acesso ao sistema sera liberado apenas para empresas convidadas durante a implantacao.
+    </div>
+    <div class="access-actions">
+      <button class="access-close" type="button" id="access-close">Entendi</button>
+      <div class="access-note">Landing publica ativa</div>
+    </div>
+  </div>
+</div>
+
 <script>
+const accessModal=document.getElementById('access-modal');
+const accessClose=document.getElementById('access-close');
+document.querySelectorAll('.js-access').forEach(el=>{
+  el.addEventListener('click',ev=>{
+    ev.preventDefault();
+    accessModal.classList.add('is-open');
+    accessModal.setAttribute('aria-hidden','false');
+  });
+});
+accessClose.addEventListener('click',()=>{
+  accessModal.classList.remove('is-open');
+  accessModal.setAttribute('aria-hidden','true');
+});
+accessModal.addEventListener('click',ev=>{
+  if(ev.target===accessModal)accessClose.click();
+});
+document.addEventListener('keydown',ev=>{
+  if(ev.key==='Escape'&&accessModal.classList.contains('is-open'))accessClose.click();
+});
+
 /* ─── CURSOR ─── */
 const c=document.getElementById('c'),cr=document.getElementById('cr');
 let cx=0,cy=0,rx=0,ry=0;
